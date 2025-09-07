@@ -1,0 +1,48 @@
+<connections>
+    <connection from="C1" to="E1_out" fromLane="0" toLane="1"/>
+
+    <connection from="C2" to="N1_out" fromLane="0" toLane="0"/>
+    <connection from="C2" to="N1_out" fromLane="0" toLane="1"/>
+
+    <connection from="E1_in" to="C2" fromLane="0" toLane="0"/>
+    <connection from="E1_in" to="E_in" fromLane="0" toLane="0"/>
+    <connection from="E1_in" to="E_in" fromLane="1" toLane="1"/>
+
+    <connection from="E1_out"/>
+
+    <connection from="E_in" to="N_out" fromLane="0" toLane="0"/>
+    <connection from="E_in" to="W_out" fromLane="0" toLane="0"/>
+    <connection from="E_in" to="W_out" fromLane="1" toLane="1"/>
+
+    <connection from="E_out" to="E1_out" fromLane="0" toLane="0"/>
+    <connection from="E_out" to="E1_out" fromLane="1" toLane="1"/>
+
+    <connection from="N1_in" to="N_in" fromLane="0" toLane="0"/>
+    <connection from="N1_in" to="N_in" fromLane="1" toLane="1"/>
+    <connection from="N1_in" to="C1" fromLane="1" toLane="0"/>
+
+    <connection from="N1_out"/>
+
+    <connection from="N_in" to="W_out" fromLane="0" toLane="0"/>
+    <connection from="N_in" to="W_out" fromLane="1" toLane="1"/>
+    <connection from="N_in" to="E_out" fromLane="1" toLane="1"/>
+
+    <connection from="N_out" to="N1_out" fromLane="0" toLane="0"/>
+    <connection from="N_out" to="N1_out" fromLane="1" toLane="1"/>
+
+    <connection from="W_in" to="E_out" fromLane="0" toLane="0"/>
+    <connection from="W_in" to="E_out" fromLane="1" toLane="1"/>
+    <connection from="W_in" to="N_out" fromLane="1" toLane="1"/>
+
+    <connection from="W_out"/>
+    
+    <connection from="W_in" to="E_out" fromLane="0" toLane="0" tl="J0" linkIndex="0"/>
+    <connection from="W_in" to="E_out" fromLane="1" toLane="1" tl="J0" linkIndex="1"/>
+    <connection from="W_in" to="N_out" fromLane="1" toLane="1" tl="J0" linkIndex="2"/>
+    <connection from="E_in" to="N_out" fromLane="0" toLane="0" tl="J0" linkIndex="3"/>
+    <connection from="E_in" to="W_out" fromLane="0" toLane="0" tl="J0" linkIndex="4"/>
+    <connection from="E_in" to="W_out" fromLane="1" toLane="1" tl="J0" linkIndex="5"/>
+    <connection from="N_in" to="W_out" fromLane="0" toLane="0" tl="J0" linkIndex="6"/>
+    <connection from="N_in" to="W_out" fromLane="1" toLane="1" tl="J0" linkIndex="7"/>
+    <connection from="N_in" to="E_out" fromLane="1" toLane="1" tl="J0" linkIndex="8"/>
+</connections>

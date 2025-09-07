@@ -8,14 +8,14 @@ from .xml_generators import saturation_flow_scenario
 from pathlib import Path
 
 
-def get_average_flow(routes_path="road-configuration/routes.xml"):
+def get_average_flow(routes_path="data/routes.xml"):
     """
     Calculate average traffic flow (veh/hour) for incoming edges to junction center,
     with fallback for non-traffic-light scenarios.
     """
     # Start SUMO simulation
     sumo_cmd = ["sumo",
-                "-n", "road-configuration/net.xml",
+                "-n", "data/net.xml",
                 "-r", routes_path]
     traci.start(sumo_cmd)
     print("All edges:", traci.edge.getIDList())
@@ -107,7 +107,7 @@ def get_average_flow(routes_path="road-configuration/routes.xml"):
 def get_saturation_flow():
     routes_path, tmp_dir = saturation_flow_scenario()
 
-    original_nodes_path = Path("road-configuration") / "nodes.xml"
+    original_nodes_path = Path("data") / "nodes.xml"
     tree = ET.parse(original_nodes_path)
     root = tree.getroot()
 
@@ -127,9 +127,9 @@ def get_saturation_flow():
         subprocess.run([
             "netconvert",
             "-n", str(nodes_path),
-            "-e", "road-configuration/edges.xml",
-            "-x", "road-configuration/connections.xml",
-            "-o", "road-configuration/net.xml"
+            "-e", "data/edges.xml",
+            "-x", "data/connections.xml",
+            "-o", "data/net.xml"
         ], check=True)
     except subprocess.CalledProcessError as e:
         print("netconvert failed:", e)

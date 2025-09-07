@@ -1,2 +1,2 @@
-from websters import websters_method
+from .websters import websters_method
 # Webster's Algorithm

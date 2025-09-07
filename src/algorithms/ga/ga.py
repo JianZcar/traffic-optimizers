@@ -67,7 +67,7 @@ def selection(
 def _evaluate_config(traffic_configuration: TrafficConfiguration, workdir: str) -> float:
     """Run SUMO in `workdir`, parse tripinfo.xml, and compute the weighted score."""
     # write TL‐logic
-    generate_tl_logic('road-configuration/connections.xml',
+    generate_tl_logic('data/connections.xml',
                       f'{workdir}/tl_logic.xml', traffic_configuration)
     xml_path = os.path.join(workdir, "tl_logic.xml")
 
@@ -75,8 +75,8 @@ def _evaluate_config(traffic_configuration: TrafficConfiguration, workdir: str) 
     tripinfo_path = os.path.join(workdir, "tripinfo.xml")
     sumo_cmd = [
         "sumo",
-        "-n", "road-configuration/net.xml",
-        "-r", "road-configuration/routes.xml",
+        "-n", "data/net.xml",
+        "-r", "data/routes.xml",
         "--additional-files", xml_path,
         "--tripinfo-output", tripinfo_path,
         "--verbose"
