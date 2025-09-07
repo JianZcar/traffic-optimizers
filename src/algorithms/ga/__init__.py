@@ -1,1 +1,1 @@
-# Genetic Algorithm
+from ga import generate_population

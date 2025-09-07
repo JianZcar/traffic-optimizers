@@ -8,6 +8,7 @@ from src.common.compute import (
     simulate_poisson_arrival_rate
 )
 
+
 def websters_method(
     L: int,
     Y: float
@@ -22,6 +23,7 @@ def websters_method(
         int: Optimal Cycle Length (s)
     """
     return ceil(1.5 * L + 5) / (1 - Y)
+
 
 def compute_signal_config_with_poisson(
     saturation_flows: List[float],  # veh/hour per phase

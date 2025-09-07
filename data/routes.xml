@@ -1,0 +1,16 @@
+<routes>
+    <vType id="car" accel="2.5" decel="4.5" maxSpeed="13.89" length="5"/>
+
+    <!-- From East -->
+    <flow id="flow_E_to_W" type="car" begin="0" end="3600" number="300" from="E1_in" to="W_out" />
+    <flow id="flow_E_to_N" type="car" begin="0" end="3600" number="300" from="E1_in" to="N1_out" />
+
+    <!-- From North -->
+    <flow id="flow_N_to_W" type="car" begin="0" end="3600" number="300" from="N1_in" to="W_out" />
+    <flow id="flow_N_to_E" type="car" begin="0" end="3600" number="300" from="N1_in" to="E_out" />
+
+    <!-- From West -->
+    <flow id="flow_W_to_E" type="car" begin="0" end="3600" number="300" from="W_in" to="E1_out" />
+    <flow id="flow_W_to_N" type="car" begin="0" end="3600" number="300" from="W_in" to="N1_out" />
+</routes>
+
