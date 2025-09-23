@@ -22,7 +22,7 @@ def websters_method(
     Returns:
         int: Optimal Cycle Length (s)
     """
-    return ceil(1.5 * L + 5) / (1 - Y)
+    return int(ceil(1.5 * L + 5) / (1 - Y))
 
 
 def compute_signal_config_with_poisson(

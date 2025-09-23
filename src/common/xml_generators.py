@@ -1,10 +1,10 @@
 import xml.etree.ElementTree as ET
-from .typings import PhaseConfig
+from .typings import TrafficConfiguration
 import tempfile
 from pathlib import Path
 
 
-def generate_tl_logic(input_path: str, output_path: str, phase_configs: list[PhaseConfig]):
+def generate_tl_logic(input_path: str, output_path: str, traffic_configuration: TrafficConfiguration):
     # Parse the input XML file
     tree = ET.parse(input_path)
     root = tree.getroot()
@@ -27,7 +27,7 @@ def generate_tl_logic(input_path: str, output_path: str, phase_configs: list[Pha
         groups[from_attr].append(link_index)
 
     # Validate config-group count match
-    if len(groups_order) != len(phase_configs):
+    if len(groups_order) != len(traffic_configuration):
         raise ValueError(
             "Number of PhaseConfigs must match number of connection groups")
 
@@ -37,7 +37,7 @@ def generate_tl_logic(input_path: str, output_path: str, phase_configs: list[Pha
 
     # Generate phases for each group with its own config
     phases = []
-    for from_attr, config in zip(groups_order, phase_configs):
+    for from_attr, config in zip(groups_order, traffic_configuration):
         link_indices = groups[from_attr]
 
         # Green phase

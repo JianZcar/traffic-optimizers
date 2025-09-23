@@ -40,7 +40,7 @@ def generate_traffic_report(xml_file: str, output_image: str) -> None:
             'timeLoss': float(trip.get('timeLoss', 0.0)),
             'departDelay': float(trip.get('departDelay', 0.0)),
             'waitingCount': int(trip.get('waitingCount', 0)),
-            'route': trip.get('id').split('.')[0],
+            'route': (trip.get('id') or "").split('.')[0],
         })
 
     if not records:
@@ -85,7 +85,7 @@ def generate_traffic_report(xml_file: str, output_image: str) -> None:
     ax2 = plt.subplot(3, 1, 2)
     wait_by_route = df.groupby(
         'route')['waitingTime'].mean().sort_values(ascending=False)
-    ax2.bar(wait_by_route.index, wait_by_route.values)
+    ax2.bar(wait_by_route.index, wait_by_route.to_numpy())
     ax2.set_title("Average Waiting Time by Route")
     ax2.set_xlabel("Route ID")
     ax2.set_ylabel("Waiting Time (s)")

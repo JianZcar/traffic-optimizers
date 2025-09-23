@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2025-09-23 16:07:32 by Eclipse SUMO netconvert Version 1.18.0
-<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
+<!-- generated on 2025-09-23 23:25:53 by Eclipse SUMO netconvert Version 1.24.0
+<netconvertConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
 
     <input>
         <node-files value="data/nodes.xml"/>
@@ -17,10 +17,10 @@
         <verbose value="true"/>
     </report>
 
-</configuration>
+</netconvertConfiguration>
 -->
 
-<net version="1.16" junctionCornerDetail="5" limitTurnSpeed="5.50" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
+<net version="1.20" junctionCornerDetail="5" limitTurnSpeed="5.50" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
 
     <location netOffset="100.00,0.00" convBoundary="0.00,0.00,200.00,100.00" origBoundary="-100.00,0.00,100.00,100.00" projParameter="!"/>
 
@@ -130,9 +130,9 @@
 
     <tlLogic id="J0" type="static" programID="0" offset="0">
         <phase duration="42" state="rrrGGGGGg"/>
-        <phase duration="3"  state="rrryyyyyy"/>
+        <phase duration="3"  state="rrrGyyyyy"/>
         <phase duration="42" state="GGGGrrrrr"/>
-        <phase duration="3"  state="yyyyrrrrr"/>
+        <phase duration="3"  state="yyyGrrrrr"/>
     </tlLogic>
 
     <junction id="E" type="priority" x="130.00" y="0.00" incLanes="E1_in_0 E1_in_1 E_out_0 E_out_1 C1_0" intLanes=":E_0_0 :E_1_0 :E_1_1 :E_3_0 :E_3_1 :E_5_0" shape="132.13,6.40 132.13,-6.40 115.07,-6.40 115.07,6.40 116.98,6.71 117.37,7.11 117.37,7.66 117.00,8.36 116.25,9.23 120.77,13.75 123.13,11.51 125.30,9.67 127.29,8.24 129.09,7.22 130.70,6.60">

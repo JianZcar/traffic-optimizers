@@ -20,8 +20,8 @@ from algorithms.websters.websters import compute_signal_config_with_poisson
 def generate_population(
     size: int,
     intersection_params: IntersectionParams
-) -> List[List[TrafficConfiguration]]:
-    population = dict()
+) -> List[TrafficConfiguration]:
+    population = list()
 
     for idx in range(size):
         signal_config = compute_signal_config_with_poisson(
@@ -33,7 +33,7 @@ def generate_population(
             deceleration_rate=intersection_params.deceleration_rate,
             vehicle_length=intersection_params.vehicle_length
         )
-        population[idx + 1] = signal_config
+        population.append(signal_config)
 
     return population
 
@@ -279,14 +279,14 @@ def mutation(
 
 
 def run_evolution(
-    population_dict: dict,
+    population: Population,
     fitness_func: FitnessFunc = fitness,
     generation_limit: int = 50
 ) -> Tuple[Population, int]:
     # Convert dictionary to list of configurations
-    population = list(population_dict.values())
-
     pprint.pprint(population)
+
+    generation = 0
 
     for generation in range(generation_limit):
         print(f"\n--- Generation {generation+1}/{generation_limit} ---")

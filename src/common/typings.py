@@ -22,7 +22,7 @@ class PhaseConfig:
 
 TrafficConfiguration = List[PhaseConfig]
 Population = List[TrafficConfiguration]
-FitnessFunc = Callable[[TrafficConfiguration], int]
+FitnessFunc = Callable[[TrafficConfiguration], float]
 
 PopulateFunc = Callable[[], Population]
 SelectionFunc = Callable[[Population, FitnessFunc],
