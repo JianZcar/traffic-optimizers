@@ -1,7 +1,7 @@
 from math import ceil
 from typing import List
-from src.common.typings import PhaseConfig
-from src.common.compute import (
+from common.typings import PhaseConfig
+from common.compute import (
     compute_amber_time,
     compute_all_red_time,
     compute_green_time,

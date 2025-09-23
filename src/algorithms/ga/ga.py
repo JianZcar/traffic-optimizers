@@ -7,14 +7,14 @@ import xml.etree.ElementTree as ET
 import os
 import tempfile
 
-from src.common.typings import (
+from common.typings import (
     TrafficConfiguration,
     Population,
     FitnessFunc,
     IntersectionParams
 )
-from src.common.xml_generators import generate_tl_logic
-from src.algorithms.websters.websters import compute_signal_config_with_poisson
+from common.xml_generators import generate_tl_logic
+from algorithms.websters.websters import compute_signal_config_with_poisson
 
 
 def generate_population(
