@@ -7,6 +7,7 @@ from common.typings import IntersectionParams
 from common.xml_generators import generate_tl_logic
 from common.run_baseline_sim import runBaseline
 from common.export_data import generate_traffic_report
+from pprint import pprint
 
 # Main CLI
 saturation_flow = get_saturation_flow()
@@ -59,21 +60,23 @@ intersection_params = IntersectionParams(
 population = generate_population(
     size=20, intersection_params=intersection_params)
 
-generate_tl_logic('data/connections.xml', "tl_logic.xml", list(population.values())[0])
+pprint(population)
+
+generate_tl_logic('data/connections.xml', "tl_logic.xml", population[0])
 
 subprocess.run(
-        [
-            "sumo",
-            "-n", "data/net.xml",
-            "-r", "data/routes.xml",
-            "--tripinfo-output", "tripinfo.xml",
-            "--additional-files", "tl_logic.xml",
-            "--verbose"
-        ],
-        check=True,       # raises if SUMO exits non-zero
-        capture_output=True,
-        text=True
-    )
+    [
+        "sumo",
+        "-n", "data/net.xml",
+        "-r", "data/routes.xml",
+        "--tripinfo-output", "tripinfo.xml",
+        "--additional-files", "tl_logic.xml",
+        "--verbose"
+    ],
+    check=True,       # raises if SUMO exits non-zero
+    capture_output=True,
+    text=True
+)
 
 generate_traffic_report("tripinfo.xml", "Initial_traffic_byWebsters.png")
 
@@ -82,23 +85,22 @@ pop = run_evolution(population)
 tl_xml = generate_tl_logic('data/connections.xml', "tl_logic.xml", pop[0][0])
 
 subprocess.run(
-        [
-            "sumo",
-            "-n", "data/net.xml",
-            "-r", "data/routes.xml",
-            "--tripinfo-output", "tripinfo.xml",
-            "--additional-files", "tl_logic.xml",
-            "--verbose"
-        ],
-        check=True,       # raises if SUMO exits non-zero
-        capture_output=True,
-        text=True
-    )
+    [
+        "sumo",
+        "-n", "data/net.xml",
+        "-r", "data/routes.xml",
+        "--tripinfo-output", "tripinfo.xml",
+        "--additional-files", "tl_logic.xml",
+        "--verbose"
+    ],
+    check=True,       # raises if SUMO exits non-zero
+    capture_output=True,
+    text=True
+)
 
 generate_traffic_report("tripinfo.xml", "finalGA.png")
 print("Initial Websters")
-population = list(population.values())
-#population.sort(key=lambda config: fitness(config))
+# population.sort(key=lambda config: fitness(config))
 print(population[0])
 
 
