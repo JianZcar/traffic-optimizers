@@ -1,194 +1,151 @@
+import json
 import subprocess
 import xml.etree.ElementTree as ET
 import traci
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Union, cast
+from typing import Dict, Union, List, cast
 from os import PathLike
+import shutil
+from common.typings import Movement, Intersection
+from common.constants import BASE_NETWORK_PATH, SATURATION_ROOT_PATH, SATURATION_CACHE_FILE
 
-from .xml_generators import saturation_flow_scenario
+
+def load_saturation_cache() -> Dict[str, float]:
+    if SATURATION_CACHE_FILE.exists():
+        with open(SATURATION_CACHE_FILE, "r") as f:
+            return json.load(f)
+    return {}
 
 
-def get_average_flow(
-    routes_path: Union[str, PathLike[str]] = "data/routes.xml"
-) -> Dict[str, float]:
+def save_saturation_cache(cache: Dict[str, float]) -> None:
+    SATURATION_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(SATURATION_CACHE_FILE, "w") as f:
+        json.dump(cache, f, indent=2)
+
+
+def movement_key(movement: Movement) -> str:
+    """Unique key for a movement (used for caching)."""
+    return f"{movement.from_approach.edge_id}->{movement.to_approach.edge_id}:{movement.num_lanes}"
+
+
+def setup_saturation_folder(movement: Movement, folder: Path) -> Path:
     """
-    Calculate average traffic flow (veh/hour) for incoming edges to junction center,
-    with fallback for non-traffic-light scenarios.
-
-    Args:
-        routes_path: Path to SUMO routes.xml file
-
-    Returns:
-        Dict[str, float]: Average flow per incoming edge (veh/hour)
-
-    Raises:
-        RuntimeError: If SUMO simulation cannot start or run properly
+    Create a dedicated folder for the movement and generate a high-demand route.
+    Returns path to the routes.xml.
     """
-    routes_path = str(routes_path)  # normalize Path -> str
+    folder.mkdir(parents=True, exist_ok=True)
+
+    # Copy base network files
+    for file_name in ["nodes.xml", "edges.xml", "connections.xml"]:
+        shutil.copy(BASE_NETWORK_PATH / file_name, folder / file_name)
+
+    # Generate routes.xml with high demand for the movement
+    routes_file = folder / "routes.xml"
+    with open(routes_file, "w") as f:
+        f.write(f"""<routes>
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.5" length="5" minGap="2.5" maxSpeed="13.9"/>
+    <flow id="flow_{movement.from_approach.edge_id}_to_{movement.to_approach.edge_id}"
+          type="car"
+          begin="0"
+          end="3600"
+          number="10000"
+          from="{movement.from_approach.edge_id}"
+          to="{movement.to_approach.edge_id}"/>
+</routes>""")
+    return routes_file
+
+
+def run_saturation_simulation(movement: Movement, routes_path: Path) -> float:
+    """
+    Run SUMO for a single movement and compute per-lane saturation flow.
+    Uses caching so repeated calls return stored results.
+    """
+    # --- check cache ---
+    cache = load_saturation_cache()
+    key = movement_key(movement)
+    if key in cache:
+        return cache[key]
+
+    # --- build network ---
+    net_file = routes_path.parent / "network.net.xml"
+    subprocess.run(
+        [
+            "netconvert",
+            "-n", str(routes_path.parent / "nodes.xml"),
+            "-e", str(routes_path.parent / "edges.xml"),
+            "-x", str(routes_path.parent / "connections.xml"),
+            "-o", str(net_file),
+        ],
+        check=True,
+    )
+
+    traci.start(["sumo", "-n", str(net_file), "-r", str(routes_path)])
 
     try:
-        sumo_cmd = ["sumo", "-n", "data/net.xml", "-r", routes_path]
-        traci.start(sumo_cmd)
-    except Exception as e:
-        raise RuntimeError(
-            f"Failed to start SUMO with routes {routes_path}") from e
+        lane_ids = [f"{movement.from_approach.edge_id}_{i}" for i in range(
+            movement.from_approach.num_lanes)]
+        prev_seen: Dict[str, set] = {lane: set() for lane in lane_ids}
+        total_passed = 0
 
-    print("All edges:", traci.edge.getIDList())
-
-    incoming_edges: list[str] = ["W_in", "N_in", "E_in"]
-    vehicle_counts: Dict[str, int] = {edge: 0 for edge in incoming_edges}
-    has_traffic_light: bool = False
-
-    # Traffic light setup
-    try:
-        tl_ids = traci.trafficlight.getIDList()
-    except traci.TraCIException as e:
-        traci.close()
-        raise RuntimeError("Failed to query traffic light IDs") from e
-
-    active_tls: str | None = None
-    phase_incoming: Dict[int, str] = {}
-
-    if tl_ids:
-        has_traffic_light = True
-        active_tls = tl_ids[0]  # use first TLS
-        try:
-            tl_program = traci.trafficlight.getCompleteRedYellowGreenDefinition(
-                active_tls
-            )
-        except traci.TraCIException as e:
-            traci.close()
-            raise RuntimeError(
-                f"Failed to fetch TLS definition for {active_tls}") from e
-        print(f"Traffic light {active_tls} phases:", tl_program)
-
-        phase_incoming = {
-            0: "E_in",
-            1: "N_in",
-            2: "W_in",
-        }
-
-    counted_vehicles: set[str] = set()
-    previous_vehicles: Dict[str, set[str]] = {
-        edge: set() for edge in incoming_edges}
-
-    try:
         while cast(int, traci.simulation.getMinExpectedNumber()) > 0:
             traci.simulationStep()
+            for lane in lane_ids:
+                current = set(traci.lane.getLastStepVehicleIDs(lane))
+                # new vehicles = those in current but not seen before
+                new = current - prev_seen[lane]
+                total_passed += len(new)
+                prev_seen[lane] |= new  # mark them as seen
 
-            if has_traffic_light and active_tls:
-                try:
-                    current_phase: int = cast(
-                        int, traci.trafficlight.getPhase(active_tls)
-                    )
-                    active_incoming: str | None = phase_incoming.get(
-                        current_phase % 3, None
-                    )
-                except traci.TraCIException:
-                    has_traffic_light = False
-                    active_incoming = None
-            else:
-                active_incoming = None
+        sim_time: float = cast(float, traci.simulation.getTime())
+        if sim_time <= 0:
+            raise RuntimeError("Simulation time is zero")
 
-            if has_traffic_light and active_incoming:
-                current_vehicles = set(
-                    traci.edge.getLastStepVehicleIDs(active_incoming)
-                )
-                new_vehicles = current_vehicles - \
-                    previous_vehicles[active_incoming]
+        # veh/h/lane
+        result = (total_passed / sim_time) * 3600
 
-                for veh_id in new_vehicles:
-                    if veh_id not in counted_vehicles:
-                        vehicle_counts[active_incoming] += 1
-                        counted_vehicles.add(veh_id)
+        # --- save to cache ---
+        cache[key] = result
+        save_saturation_cache(cache)
 
-                previous_vehicles[active_incoming] = current_vehicles.copy()
-            else:
-                for edge in incoming_edges:
-                    current_vehicles = set(
-                        traci.edge.getLastStepVehicleIDs(edge))
-                    new_vehicles = current_vehicles - previous_vehicles[edge]
+        return result
 
-                    for veh_id in new_vehicles:
-                        if veh_id not in counted_vehicles:
-                            vehicle_counts[edge] += 1
-                            counted_vehicles.add(veh_id)
-
-                    previous_vehicles[edge] = current_vehicles.copy()
-
-        total_time: float = cast(float, traci.simulation.getTime())
     finally:
         traci.close()
 
-    if total_time <= 0:
-        raise RuntimeError("Simulation time is zero, cannot compute flows")
 
-    average_flows: Dict[str, float] = {
-        edge: (vehicle_counts[edge] / total_time) * 3600 for edge in incoming_edges
-    }
-
-    print(
-        f"Average flows ({'with' if has_traffic_light else 'without'} traffic lights):"
-    )
-    print(average_flows)
-    return average_flows
-
-
-def get_saturation_flow() -> float:
+def derive_saturation_flows(intersection: Intersection):
     """
-    Runs a temporary saturation flow scenario and computes the saturated flow
-    for the eastbound approach (E_in).
-
-    Returns:
-        float: Saturated flow for E_in (veh/hour)
-
-    Raises:
-        RuntimeError: If netconvert or SUMO simulation fails
+    Loop through all movements, run dedicated simulations (if needed),
+    and compute saturation flows. Uses cache when available.
     """
-    routes_path, tmp_dir = saturation_flow_scenario()
+    saturation_root = Path("data/saturation")
+    cache = load_saturation_cache()
 
-    original_nodes_path = Path("data") / "nodes.xml"
-    try:
-        tree = ET.parse(original_nodes_path)
-    except ET.ParseError as e:
-        raise RuntimeError(f"Failed to parse {original_nodes_path}") from e
+    for m in intersection.movements:
+        key = movement_key(m)
 
+        if key in cache:
+            m.saturation_flow = cache[key]
+            print(
+                f"[CACHE] {m.from_approach.name} -> {m.to_approach.name}: {m.saturation_flow:.1f} veh/h/lane")
+        else:
+            folder = saturation_root / \
+                f"{m.from_approach.edge_id}_to_{m.to_approach.edge_id}"
+            routes_path = setup_saturation_folder(m, folder)
+            m.saturation_flow = run_saturation_simulation(m, routes_path)
+            print(
+                f"[SIMULATED] {m.from_approach.name} -> {m.to_approach.name}: {m.saturation_flow:.1f} veh/h/lane")
+
+
+def get_all_incoming_edges(routes_path: Union[str, PathLike[str]]) -> list[str]:
+    """Parse routes.xml to get all unique 'from' edges."""
+    tree = ET.parse(routes_path)
     root = tree.getroot()
-
-    modified_root = ET.Element("nodes")
-    for node in root.findall("node"):
-        node_copy = ET.Element("node", node.attrib)
-        if node_copy.get("id") == "J0":
-            node_copy.set("type", "priority")
-        modified_root.append(node_copy)
-
-    nodes_path = Path(tmp_dir) / "nodes.xml"
-    ET.ElementTree(modified_root).write(
-        str(nodes_path), encoding="utf-8", xml_declaration=True
-    )
-
-    try:
-        subprocess.run(
-            [
-                "netconvert",
-                "-n", str(nodes_path),
-                "-e", "data/edges.xml",
-                "-x", "data/connections.xml",
-                "-o", "data/net.xml",
-            ],
-            check=True,
-        )
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError("netconvert failed") from e
-
-    flows = get_average_flow(str(routes_path))
-
-    if "E_in" not in flows:
-        raise RuntimeError("No flow data for E_in in simulation output")
-
-    print(f"Saturated flow: {flows['E_in']}")
-    return flows["E_in"]
+    # only include non-None 'from' attributes
+    edges = {flow.get("from") for flow in root.findall(
+        "flow") if flow.get("from") is not None}
+    return [edge for edge in edges if edge is not None]
 
 
 def average_queue_length_per_edge(queue_output_path: str) -> Dict[str, float]:

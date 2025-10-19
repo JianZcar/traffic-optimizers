@@ -1,16 +1,2 @@
-<routes>
-    <vType id="car" accel="2.5" decel="4.5" maxSpeed="13.89" length="5"/>
-
-    <!-- From East -->
-    <flow id="flow_E_to_W" type="car" begin="0" end="3600" number="300" from="E1_in" to="W_out" />
-    <flow id="flow_E_to_N" type="car" begin="0" end="3600" number="300" from="E1_in" to="N1_out" />
-
-    <!-- From North -->
-    <flow id="flow_N_to_W" type="car" begin="0" end="3600" number="300" from="N1_in" to="W_out" />
-    <flow id="flow_N_to_E" type="car" begin="0" end="3600" number="300" from="N1_in" to="E_out" />
-
-    <!-- From West -->
-    <flow id="flow_W_to_E" type="car" begin="0" end="3600" number="300" from="W_in" to="E1_out" />
-    <flow id="flow_W_to_N" type="car" begin="0" end="3600" number="300" from="W_in" to="N1_out" />
-</routes>
-
+<?xml version='1.0' encoding='utf-8'?>
+<routes><flow id="flow_N_in_to_S_out" from="N_in" to="S_out" begin="0" end="3600" vehsPerHour="200" /><flow id="flow_N_in_to_W_out" from="N_in" to="W_out" begin="0" end="3600" vehsPerHour="200" /><flow id="flow_N_in_to_E_out" from="N_in" to="E_out" begin="0" end="3600" vehsPerHour="200" /><flow id="flow_S_in_to_N_out" from="S_in" to="N_out" begin="0" end="3600" vehsPerHour="200" /><flow id="flow_S_in_to_E_out" from="S_in" to="E_out" begin="0" end="3600" vehsPerHour="200" /><flow id="flow_S_in_to_W_out" from="S_in" to="W_out" begin="0" end="3600" vehsPerHour="200" /><flow id="flow_E_in_to_W_out" from="E_in" to="W_out" begin="0" end="3600" vehsPerHour="200" /><flow id="flow_E_in_to_N_out" from="E_in" to="N_out" begin="0" end="3600" vehsPerHour="200" /><flow id="flow_E_in_to_S_out" from="E_in" to="S_out" begin="0" end="3600" vehsPerHour="200" /><flow id="flow_W_in_to_E_out" from="W_in" to="E_out" begin="0" end="3600" vehsPerHour="200" /><flow id="flow_W_in_to_S_out" from="W_in" to="S_out" begin="0" end="3600" vehsPerHour="200" /><flow id="flow_W_in_to_N_out" from="W_in" to="N_out" begin="0" end="3600" vehsPerHour="200" /></routes>

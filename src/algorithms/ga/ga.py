@@ -6,42 +6,42 @@ import subprocess
 import xml.etree.ElementTree as ET
 import os
 import tempfile
-
+from pathlib import Path
 from common.typings import (
-    TrafficConfiguration,
-    Population,
+    SignalPlan,
+    SignalPopulation,
     FitnessFunc,
-    IntersectionParams
+    Approach,
+    Movement
 )
 from common.xml_generators import generate_tl_logic
 from algorithms.websters.websters import compute_signal_config_with_poisson
 
 
-def generate_population(
-    size: int,
-    intersection_params: IntersectionParams
-) -> List[TrafficConfiguration]:
-    population = list()
+def generate_population(size: int, movements: List[Movement]) -> List[SignalPlan]:
+    """
+    Generate a population of traffic signal configurations based on PhaseParams.
 
-    for idx in range(size):
-        signal_config = compute_signal_config_with_poisson(
-            saturation_flows=intersection_params.saturation_flows,
-            lambda_rates=intersection_params.lambda_rates,
-            reaction_time=intersection_params.reaction_time,
-            road_widths=intersection_params.road_widths,
-            vehicle_speed=intersection_params.vehicle_speed,
-            deceleration_rate=intersection_params.deceleration_rate,
-            vehicle_length=intersection_params.vehicle_length
-        )
-        population.append(signal_config)
+    Args:
+        size: Number of candidate configurations to generate
+        movements: List of PhaseParams defining each phase
+
+    Returns:
+        List of individuals, each a list of PhaseConfig objects
+    """
+    population = []
+
+    for _ in range(size):
+        tl_config = compute_signal_config_with_poisson(movements)
+        population.append(tl_config)
 
     return population
 
 
 def selection(
-    population: Population,
+    population: SignalPopulation,
     fitness_func: FitnessFunc
-) -> Population:
+) -> SignalPopulation:
     """
     Selects two individuals from the population based on fitness-proportional selection (roulette wheel).
 
@@ -58,17 +58,17 @@ def selection(
     """
     return choices(
         population=population,
-        weights=[fitness_func(traffic_configuration)
-                 for traffic_configuration in population],
+        weights=[fitness_func(signal_plan)
+                 for signal_plan in population],
         k=2
     )
 
 
-def _evaluate_config(traffic_configuration: TrafficConfiguration, workdir: str) -> float:
+def _evaluate_config(signal_plan: SignalPlan, workdir: str) -> float:
     """Run SUMO in `workdir`, parse tripinfo.xml, and compute the weighted score."""
     # write TL‐logic
-    generate_tl_logic('data/connections.xml',
-                      f'{workdir}/tl_logic.xml', traffic_configuration)
+    generate_tl_logic(Path('data/connections.xml'),
+                      Path(f'{workdir}/tl_logic.xml'), signal_plan)
     xml_path = os.path.join(workdir, "tl_logic.xml")
 
     # run SUMO
@@ -118,28 +118,28 @@ def _evaluate_config(traffic_configuration: TrafficConfiguration, workdir: str) 
     return round(score, 2)
 
 
-def fitness(traffic_configuration: TrafficConfiguration) -> float:
+def fitness(signal_plan: SignalPlan) -> float:
     """Evaluate traffic config using SUMO simulation metrics."""
     # quick green‐time sanity check
     min_green = 5
-    if any(phase.green < min_green for phase in traffic_configuration):
+    if any(phase.green < min_green for phase in signal_plan):
         return float('inf')
 
     # isolate each run in its own tempdir
     with tempfile.TemporaryDirectory() as workdir:
         try:
-            return _evaluate_config(traffic_configuration, workdir)
+            return _evaluate_config(signal_plan, workdir)
         except Exception as e:
             print(f"Simulation failed: {e}")
             return float('inf')
 
 
 def n_point_crossover(
-    a: TrafficConfiguration,
-    b: TrafficConfiguration,
+    a: SignalPlan,
+    b: SignalPlan,
     n: int = 1,
     min_green: int = 5
-) -> Tuple[TrafficConfiguration, TrafficConfiguration]:
+) -> Tuple[SignalPlan, SignalPlan]:
     """
     Performs n-point crossover between two parent configurations.
 
@@ -191,11 +191,11 @@ def n_point_crossover(
 
 
 def crossover(
-    a: TrafficConfiguration,
-    b: TrafficConfiguration,
+    a: SignalPlan,
+    b: SignalPlan,
     num_offspring: int = 3,
     max_points: int = 2
-) -> List[TrafficConfiguration]:
+) -> List[SignalPlan]:
     """
     Generates multiple offspring using varied n-point crossover.
 
@@ -223,10 +223,10 @@ def crossover(
 
 
 def mutation(
-    traffic_configuration: TrafficConfiguration,
+    signal_plan: SignalPlan,
     delta: float = 5.0,
     min_green: float = 5.0
-) -> TrafficConfiguration:
+) -> SignalPlan:
     """
     Applies Green Time Shift Mutation to a traffic signal configuration.
 
@@ -236,7 +236,7 @@ def mutation(
     Green times are clamped to a minimum threshold to ensure safety and feasibility.
 
     Args:
-        traffic_configuration (TrafficConfiguration): The traffic signal configuration
+        signal_plan (SignalPlan): The traffic signal configuration
             to be mutated, consisting of multiple phases.
         delta (float, optional): Maximum magnitude of the mutation shift in seconds.
             Defaults to 5.0.
@@ -244,14 +244,14 @@ def mutation(
             Defaults to 5.0.
 
     Returns:
-        TrafficConfiguration: A new traffic configuration with the green time
+        SignalPlan: A new traffic configuration with the green time
         of one phase mutated and the rest adjusted accordingly.
     """
-    num_phases = len(traffic_configuration)
+    num_phases = len(signal_plan)
     if num_phases <= 1:
-        return traffic_configuration
+        return signal_plan
 
-    mutated_configuration = copy.deepcopy(traffic_configuration)
+    mutated_configuration = copy.deepcopy(signal_plan)
 
     i = randint(0, num_phases - 1)
     mutation = uniform(-delta, delta)
@@ -279,10 +279,10 @@ def mutation(
 
 
 def run_evolution(
-    population: Population,
+    population: SignalPopulation,
     fitness_func: FitnessFunc = fitness,
     generation_limit: int = 50
-) -> Tuple[Population, int]:
+) -> Tuple[SignalPopulation, int]:
     # Convert dictionary to list of configurations
     pprint.pprint(population)
 

@@ -7,8 +7,8 @@ def runBaseline():
     subprocess.run(
         [
             "sumo",
-            "-n", "data/net.xml",
-            "-r", "data/routes.xml",
+            "-n", "sumo/base/network.net.xml",
+            "-r", "sumo/base/routes.xml",
             "--tripinfo-output", "tripinfo.xml",
             "--verbose"
         ],
@@ -16,6 +16,6 @@ def runBaseline():
         capture_output=True,
         text=True
     )
-    data_capture.get_average_flow()
+    # data_capture.get_average_flow()
     generate_traffic_report(
         "tripinfo.xml", "Initial_notrafficlight_bySUMO.png")

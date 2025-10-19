@@ -1,2 +1,2 @@
 total_trips,avg_duration,total_simulation_time,avg_speed_kmh,avg_time_loss,total_waiting_time,avg_waiting_time,total_stops,delayed_departures,avg_depart_delay,total_distance_km
-1800,36.977222222222224,3656.0,17.02,23.03601666666667,23541.0,13.078333333333333,1564,900,3.0,314.77
+2600,74.11884615384615,5795.0,10.75,57.26707692307692,104747.0,40.28730769230769,4331,1678,1173.2511918951134,575.18

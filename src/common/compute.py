@@ -41,7 +41,7 @@ def compute_all_red_time(
 def compute_green_time(
     y: int | float,
     Y: int | float,
-    C: int,
+    C: int | float,
     L: int
 ) -> int:
     return ceil((y * (C - L)) / Y)

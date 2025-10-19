@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <input>
+        <!-- Your network -->
+        <net-file value="sumo/base/network.net.xml"/>
+
+        <!-- Your routes -->
+        <route-files value="sumo/base/routes.xml"/>
+
+        <!-- Optional: traffic light logic if external -->
+        <!-- <additional-files value="sumo/ga/tl_config.xml"/> -->
+    </input>
+
+    <time>
+        <begin value="0"/>
+        <end value="3600"/> <!-- 1 hour -->
+        <step-length value="1.0"/> <!-- 1 second steps -->
+    </time>
+
+    <report>
+        <verbose value="true"/>
+        <no-step-log value="true"/>
+    </report>
+</configuration>
