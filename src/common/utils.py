@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Set
+from collections import defaultdict
 from common.typings import Approach, Movement
 
 
@@ -32,54 +33,64 @@ def attach_link_indices(connections_path: Path, movements: list[Movement]) -> No
 
 
 def allocate_lanes_per_approach(
-    approach: Approach, movements: List[Movement]
-) -> List[Tuple[Movement, List[int]]]:
+    approach_edge: str,
+    movements: List["Movement"],
+    approach_num_lanes: int,
+    used_lanes: Dict[str, Set[int]],
+    reverse: bool = False
+) -> List[Tuple["Movement", List[int]]]:
     """
-    Assign from-lanes per movement, using direction rules:
-      - left turns → leftmost lanes
-      - right turns → rightmost lanes
-      - straight → middle lanes
-    Ensures fair sharing if oversubscribed.
-    """
-    total = int(approach.num_lanes)
-    used: set[int] = set()
-    allocations: List[Tuple[Movement, List[int]]] = []
+    Dynamic lane allocation per approach for SUMO with orientation awareness.
+    Lane 0 = rightmost, lane n-1 = leftmost (from vehicle perspective).
+    reverse=True flips the indexing (for approaches from south or west).
 
-    if not movements:
-        return allocations
+    Tracks which lanes are already used in used_lanes dict.
+    """
+    allocations: List[Tuple["Movement", List[int]]] = []
+    total = approach_num_lanes
+
+    def lane_index(i: int) -> int:
+        """Convert physical lane index to SUMO lane index, considering reverse."""
+        return total - 1 - i if reverse else i
 
     for mv in movements:
         need = min(mv.num_lanes, total)
-        lanes: list[int] = []
+        lanes: List[int] = []
 
+        # Left turns → leftmost available
         if mv.movement_type == "left":
-            candidates = range(total)  # 0,1,...
-        elif mv.movement_type == "right":
-            candidates = reversed(range(total))  # N-1,...
-        else:  # straight
-            mid = total // 2
-            candidates = []
-            for offset in range(total):
-                for cand in [mid - offset, mid + offset]:
-                    if 0 <= cand < total:
-                        candidates.append(cand)
-
-        # assign preferred lanes if free
-        for i in candidates:
-            if i not in used:
-                lanes.append(i)
-                used.add(i)
-            if len(lanes) == need:
-                break
-
-        # if not enough, allow sharing (reuse lanes)
-        if len(lanes) < need:
-            for i in candidates:
-                if i not in lanes:
-                    lanes.append(i)
+            for i in reversed(range(total)):
+                idx = lane_index(i)
+                if idx not in used_lanes[approach_edge]:
+                    lanes.append(idx)
                 if len(lanes) == need:
                     break
 
+        # Right turns → rightmost available
+        elif mv.movement_type == "right":
+            for i in range(total):
+                idx = lane_index(i)
+                if idx not in used_lanes[approach_edge]:
+                    lanes.append(idx)
+                if len(lanes) == need:
+                    break
+
+        # Straight → middle outward
+        else:
+            mid = total // 2
+            candidates = []
+            for offset in range(total):
+                for cand in (mid - offset, mid + offset):
+                    if 0 <= cand < total and cand not in candidates:
+                        candidates.append(cand)
+            for i in candidates:
+                idx = lane_index(i)
+                if idx not in used_lanes[approach_edge]:
+                    lanes.append(idx)
+                if len(lanes) == need:
+                    break
+
+        used_lanes[approach_edge].update(lanes)
         allocations.append((mv, sorted(lanes)))
 
     return allocations

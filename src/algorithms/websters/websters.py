@@ -124,7 +124,8 @@ def compute_signal_config_with_poisson(
                 if start_times[j] >= 0 and conflict_matrix[i][j]:
                     earliest = max(
                         earliest,
-                        start_times[j] + green_times[j] + amber_times[j] + all_red_times[j]
+                        start_times[j] + green_times[j] +
+                        amber_times[j] + all_red_times[j]
                     )
             start_times[i] = earliest
 
@@ -174,15 +175,16 @@ def compute_signal_config_with_poisson(
             to_approach=phases[i].to_approach.name,
             state="",  # will be filled below
             duration=green_times[i] + amber_times[i] + all_red_times[i],
-            link_index=i
+            link_index=i,
+            movements=[phases[i]]  # traceability
         )
         tl_config.append(cfg)
 
         # Debug print
         print(f"[DEBUG] PhaseConfig {i}: from={cfg.from_approach}, "
-            f"to={cfg.to_approach}, start={cfg.start:.2f}, "
-            f"green={cfg.green:.2f}, amber={cfg.amber:.2f}, "
-            f"all_red={cfg.all_red:.2f}, duration={cfg.duration:.2f}")
+              f"to={cfg.to_approach}, start={cfg.start:.2f}, "
+              f"green={cfg.green:.2f}, amber={cfg.amber:.2f}, "
+              f"all_red={cfg.all_red:.2f}, duration={cfg.duration:.2f}")
 
     # ------------------ 8) Build SUMO-compatible states ------------------
     sumo_states = build_sumo_tl_states(tl_config, phases)
@@ -206,11 +208,12 @@ def build_sumo_tl_states(configs: SignalPlan, phases: List[Movement]) -> List[di
     Uses link_index from Movement to build the state string.
     """
     # total number of links = max link_index + 1
-    total_links = max(p.link_index for p in phases if p.link_index is not None) + 1
+    total_links = max(
+        p.link_index for p in phases if p.link_index is not None) + 1
     events = []
 
     # Map configs back to phases (to access link_index)
-    cfg_to_phase = { (c.from_approach, c.to_approach): p for c,p in zip(configs, phases) }
+    cfg_to_phase = {(c.from_approach, c.to_approach): p for c, p in zip(configs, phases)}
 
     # Collect all start/transition times
     for cfg in configs:

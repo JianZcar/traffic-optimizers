@@ -78,15 +78,19 @@ class Movement:
 class SignalPhase:
     """
     Computed configuration for a traffic signal phase.
+    Each phase represents a movement from one approach to another,
+    with timing and SUMO-compatible state information.
     """
     green: float
     amber: float
     all_red: float
     start: float
-    movements: List[Movement]            # movements served in this phase
-    # SUMO phase state string (e.g., "GrGr")
+    from_approach: str
+    to_approach: str
     state: str
-    duration: float                      # Total duration of this phase
+    duration: float
+    link_index: Optional[int] = None
+    movements: List["Movement"] = field(default_factory=list)
 
 
 # A complete traffic signal plan (set of all phases for the intersection)
@@ -102,6 +106,7 @@ class Intersection:
     approaches: List[Approach]
     movements: List[Movement]
     # currently assigned signal phases
+    intersection_type: str = "T"
     signal_plan: Optional[SignalPlan] = None
     position: Tuple[float, float] = (0.0, 0.0)  # optional center coordinates
     radius: float = 30.0  # SUMO junction radius

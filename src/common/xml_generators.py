@@ -1,3 +1,4 @@
+from collections import defaultdict
 import xml.etree.ElementTree as ET
 from typing import List, Tuple, Set
 from .typings import Intersection, SignalPlan
@@ -55,114 +56,91 @@ def build_edges_xml(intersection: Intersection, output_path: Path) -> None:
         output_path, encoding="utf-8", xml_declaration=True)
 
 
-# ---------------- Connections ----------------
-def get_to_lane_order(mv: Movement, num_to: int) -> List[int]:
-    """Return preferred lane order for a movement type."""
-    if mv.movement_type == "left":
-        # prefer leftmost lanes (0,1,...)
-        return list(range(num_to))
-    elif mv.movement_type == "right":
-        # prefer rightmost lanes (N-1, N-2,...)
-        return list(reversed(range(num_to)))
-    else:  # straight
-        # fill from center outward
-        mid = num_to // 2
-        order = []
-        for offset in range(num_to):
-            for cand in [mid - offset, mid + offset]:
-                if 0 <= cand < num_to and cand not in order:
-                    order.append(cand)
-        return order
+def get_to_lane(mv: "Movement", num_to: int, used_lanes: Dict[str, Set[int]]) -> int:
+    """
+    Dynamic assignment for outgoing lane considering approach orientation.
 
-
-def pick_to_lane(mv: Movement, num_to: int, counters: Dict[str, int]) -> int:
-    """Pick next to-lane using round robin within the preferred order."""
-    order = get_to_lane_order(mv, num_to)
-    if not order:
+    - Left → leftmost (or reversed if south/west)
+    - Right → rightmost (or reversed if south/west)
+    - Straight → middle lane
+    """
+    if num_to <= 0:
         return 0
 
-    key = f"{mv.to_approach.edge_id}:{mv.movement_type}"
-    counter = counters.get(key, 0)
-    lane = order[counter % len(order)]
-    counters[key] = counter + 1
-    return lane
+    to_edge = mv.to_approach.edge_id
+    used = used_lanes.setdefault(to_edge, set())
+
+    # Determine approach orientation
+    dx = mv.from_approach.x - mv.to_approach.x
+    dy = mv.from_approach.y - mv.to_approach.y
+    reverse = dy < 0 or dx > 0  # south or east approaches reverse indexing
+
+    # Compute candidate lanes
+    if mv.movement_type == "left":
+        candidates = list(range(num_to))
+    elif mv.movement_type == "right":
+        candidates = list(reversed(range(num_to)))
+    else:  # straight
+        mid = num_to // 2
+        candidates = []
+        for offset in range(num_to):
+            for cand in (mid - offset, mid + offset):
+                if 0 <= cand < num_to and cand not in candidates:
+                    candidates.append(cand)
+
+    if reverse:
+        candidates = list(reversed(candidates))
+
+    # pick first unused lane
+    for i in candidates:
+        if i not in used:
+            used.add(i)
+            return i
+
+    # fallback
+    for i in range(num_to):
+        if i not in used:
+            used.add(i)
+            return i
+    return 0
 
 
-def fill_missing_connections(
-    root: ET.Element, out_app: Approach, used_to: Dict[str, Set[int]],
-    tl_id: str, link_index: int
-) -> int:
-    """Ensure every outgoing lane has a connection; duplicate if needed."""
-    all_lanes = set(range(max(1, int(out_app.num_lanes))))
-    used = used_to.get(out_app.edge_id, set())
-    missing = sorted(all_lanes - used)
-    if not missing:
-        return link_index
-
-    if used:
-        first_conn = next(
-            (c for c in root.findall("connection")
-             if c.attrib["to"] == out_app.edge_id),
-            None,
-        )
-        if first_conn:
-            donor_from = first_conn.attrib["from"]
-            donor_fromLane = first_conn.attrib["fromLane"]
-            for m in missing:
-                ET.SubElement(
-                    root,
-                    "connection",
-                    {
-                        "from": donor_from,
-                        "to": out_app.edge_id,
-                        "fromLane": donor_fromLane,
-                        "toLane": str(m),
-                        "tl": tl_id,
-                        "linkIndex": str(link_index),
-                    },
-                )
-                print(
-                    f"[FILLED] {donor_from}_{donor_fromLane} → {out_app.edge_id}_{m} (filled)"
-                )
-                link_index += 1
-    else:
-        print(
-            f"⚠️ No incoming connections target {out_app.edge_id}; lanes {missing} remain unconnected"
-        )
-    return link_index
+# ---------------- Connections ----------------
 
 
-def build_connections_xml(
-    intersection: Intersection, output_path: Path, tl_id: str = "J0"
-) -> None:
+def build_connections_xml(intersection, output_path: Path, tl_id: str = "J0") -> None:
     """
-    Build SUMO <connections> XML.
-
-    - Uses allocate_lanes_per_approach(...) for from-lanes.
-    - Distributes to-lanes based on movement type (left/right/straight) with round-robin counters.
-    - Fills missing outgoing lanes to avoid SUMO warnings.
+    Build SUMO <connections> XML for T/X intersections.
+    Fully deterministic, no balancing maps, no fill_missing_connections.
     """
     root = ET.Element("connections")
     link_index = 0
+    preview_lines = []
 
-    # Group movements by from_approach
-    by_approach: Dict[str, List[Movement]] = {}
+    # Group movements by from_approach.edge_id
+    by_from = {}
     for mv in intersection.movements:
-        by_approach.setdefault(mv.from_approach.edge_id, []).append(mv)
+        by_from.setdefault(mv.from_approach.edge_id, []).append(mv)
 
-    # Round-robin counters for each (to_edge, movement_type)
-    to_lane_counters: Dict[str, int] = {}
-    preview_lines: List[str] = []
+    used_lanes: Dict[str, Set[int]] = defaultdict(set)
 
-    # Assign connections
-    for from_edge_id, mvs in by_approach.items():
-        approach = mvs[0].from_approach
-        allocations = allocate_lanes_per_approach(approach, mvs)
+    for from_edge_id, mvs in by_from.items():
+        approach_num_lanes = mvs[0].from_approach.num_lanes
+        reverse = mvs[0].from_approach.y < 0 or mvs[0].from_approach.x > 0
+
+        allocations = allocate_lanes_per_approach(
+            approach_edge=mvs[0].from_approach.edge_id,
+            movements=mvs,
+            approach_num_lanes=approach_num_lanes,
+            used_lanes=used_lanes,
+            reverse=reverse
+        )
 
         for mv, from_lanes in allocations:
             num_to_lanes = max(1, int(mv.to_approach.num_lanes))
+            to_lane = get_to_lane(mv, num_to_lanes, used_lanes)
+
             for from_lane in from_lanes:
-                to_lane = pick_to_lane(mv, num_to_lanes, to_lane_counters)
                 ET.SubElement(
                     root,
                     "connection",
@@ -181,18 +159,6 @@ def build_connections_xml(
                 )
                 link_index += 1
 
-    # Validate: ensure every outgoing lane has at least one connection
-    used_to: Dict[str, Set[int]] = {}
-    for conn in root.findall("connection"):
-        to = conn.attrib["to"]
-        used_to.setdefault(to, set()).add(int(conn.attrib["toLane"]))
-
-    # Fill any missing lanes
-    for out_app in intersection.approaches:
-        if out_app.edge_id.endswith("_out"):
-            link_index = fill_missing_connections(
-                root, out_app, used_to, tl_id, link_index)
-
     # Print preview
     print("\n=== Connection Allocation Preview ===")
     for line in preview_lines:
@@ -202,9 +168,10 @@ def build_connections_xml(
     # Write XML
     ET.ElementTree(root).write(
         output_path, encoding="utf-8", xml_declaration=True)
-    
-    
+
 # ---------------- Routes ----------------
+
+
 def build_routes_xml(intersection: Intersection, output_path: Path) -> None:
     """
     Generate routes.xml with flows for each movement.

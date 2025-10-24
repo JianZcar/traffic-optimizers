@@ -1,5 +1,6 @@
 from typing import List, Dict, Optional, Tuple
 from common.typings import Approach, Movement, Intersection, SignalPlan
+from common.intersection_presets import T_INTERSECTION, X_INTERSECTION
 
 
 def create_approaches(input_data: List[Dict]) -> List[Approach]:
@@ -75,4 +76,19 @@ def build_intersection(
         signal_plan=signal_plan,
         position=position,
         radius=radius
+    )
+
+
+def build_fixed_intersection(kind: str) -> Intersection:
+    presets = {
+        "T": T_INTERSECTION,
+        "X": X_INTERSECTION
+    }
+    config = presets[kind.upper()]
+    return build_intersection(
+        name=config["name"],
+        approach_data=config["approaches"],
+        allowed_movements=config["movements"],
+        position=(0, 0),
+        radius=1.0
     )

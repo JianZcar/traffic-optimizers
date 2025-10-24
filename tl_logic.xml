@@ -1,42 +1,24 @@
 <additional>
   <tlLogics version="1.16">
     <tlLogic id="J0" type="static" programID="1" offset="0">
-      <phase duration="3" state="Grrrrrrrrrrr"/>
-      <phase duration="3" state="yrrrrrrrrrrr"/>
-      <phase duration="1" state="rrrrrrrrrrrr"/>
-      <phase duration="3" state="rGrrrrrrrrrr"/>
-      <phase duration="3" state="ryrrrrrrrrrr"/>
-      <phase duration="1" state="rrrrrrrrrrrr"/>
-      <phase duration="3" state="rrGrrrrrrrrr"/>
-      <phase duration="3" state="rryrrrrrrrrr"/>
-      <phase duration="1" state="rrrrrrrrrrrr"/>
-      <phase duration="3" state="rrrGrrrrrrrr"/>
-      <phase duration="3" state="rrryrrrrrrrr"/>
-      <phase duration="1" state="rrrrrrrrrrrr"/>
-      <phase duration="3" state="rrrrGrrrrrrr"/>
-      <phase duration="3" state="rrrryrrrrrrr"/>
-      <phase duration="1" state="rrrrrrrrrrrr"/>
-      <phase duration="3" state="rrrrrGrrrrrr"/>
-      <phase duration="3" state="rrrrryrrrrrr"/>
-      <phase duration="1" state="rrrrrrrrrrrr"/>
-      <phase duration="3" state="rrrrrrGrrrrr"/>
-      <phase duration="3" state="rrrrrryrrrrr"/>
-      <phase duration="1" state="rrrrrrrrrrrr"/>
-      <phase duration="3" state="rrrrrrrGrrrr"/>
-      <phase duration="3" state="rrrrrrryrrrr"/>
-      <phase duration="1" state="rrrrrrrrrrrr"/>
-      <phase duration="3" state="rrrrrrrrGrrr"/>
-      <phase duration="3" state="rrrrrrrryrrr"/>
-      <phase duration="1" state="rrrrrrrrrrrr"/>
-      <phase duration="3" state="rrrrrrrrrGrr"/>
-      <phase duration="3" state="rrrrrrrrryrr"/>
-      <phase duration="1" state="rrrrrrrrrrrr"/>
-      <phase duration="3" state="rrrrrrrrrrGr"/>
-      <phase duration="3" state="rrrrrrrrrryr"/>
-      <phase duration="1" state="rrrrrrrrrrrr"/>
-      <phase duration="3" state="rrrrrrrrrrrG"/>
-      <phase duration="3" state="rrrrrrrrrrry"/>
-      <phase duration="1" state="rrrrrrrrrrrr"/>
+      <phase duration="5" state="Grrrrr"/>
+      <phase duration="3" state="yrrrrr"/>
+      <phase duration="1" state="rrrrrr"/>
+      <phase duration="3" state="rGrrrr"/>
+      <phase duration="3" state="ryrrrr"/>
+      <phase duration="1" state="rrrrrr"/>
+      <phase duration="2" state="rrGrrr"/>
+      <phase duration="3" state="rryrrr"/>
+      <phase duration="1" state="rrrrrr"/>
+      <phase duration="5" state="rrrGrr"/>
+      <phase duration="3" state="rrryrr"/>
+      <phase duration="1" state="rrrrrr"/>
+      <phase duration="2" state="rrrrGr"/>
+      <phase duration="3" state="rrrryr"/>
+      <phase duration="1" state="rrrrrr"/>
+      <phase duration="5" state="rrrrrG"/>
+      <phase duration="3" state="rrrrry"/>
+      <phase duration="1" state="rrrrrr"/>
     </tlLogic>
   </tlLogics>
 </additional>
