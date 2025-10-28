@@ -18,21 +18,24 @@ from common.xml_generators import generate_tl_logic
 from algorithms.websters.websters import compute_signal_config_with_poisson
 
 
-def generate_population(size: int, movements: List[Movement]) -> List[SignalPlan]:
+def generate_population(size: int, movements: List[Movement]) -> SignalPopulation:
     """
-    Generate a population of traffic signal configurations based on PhaseParams.
+    Generate a population of traffic signal configurations using Poisson flow simulation.
 
     Args:
         size: Number of candidate configurations to generate
-        movements: List of PhaseParams defining each phase
+        movements: List of Movement objects defining each allowed movement
 
     Returns:
-        List of individuals, each a list of PhaseConfig objects
+        SignalPopulation: List of SignalPlan objects, each a list of SignalPhase objects
     """
-    population = []
+    population: SignalPopulation = []
 
     for _ in range(size):
-        tl_config = compute_signal_config_with_poisson(movements)
+        # Use Poisson-based computation to get realistic green/amber/all-red times
+        tl_config = compute_signal_config_with_poisson(movements, mode='sequential')
+
+        # The function already populates SignalPhase objects with SUMO-compatible states
         population.append(tl_config)
 
     return population

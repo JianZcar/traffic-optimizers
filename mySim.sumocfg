@@ -2,10 +2,12 @@
 <configuration>
     <input>
         <!-- Your network -->
-        <net-file value="sumo/base/network.net.xml"/>
+        <!-- <net-file value="sumo/base/network.net.xml"/> -->
+        <net-file value="data/saturation/1_in_to_3_out/lane_1/network.net.xml"/>
 
         <!-- Your routes -->
-        <route-files value="sumo/base/routes.xml"/>
+        <!-- <route-files value="sumo/base/routes.xml"/> -->
+        <route-files value="data/saturation/1_in_to_3_out/lane_1/routes.xml"/>
 
         <!-- Optional: traffic light logic if external -->
         <!-- <additional-files value="sumo/ga/tl_config.xml"/> -->

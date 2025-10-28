@@ -1,0 +1,19 @@
+<routes>
+    <vType id="car"
+           accel="2.6"
+           decel="4.5"
+           sigma="0.5"
+           length="5"
+           minGap="2.5"
+           maxSpeed="13.9"/>
+
+    <flow id="flow_3_in_0_to_4_out"
+          type="car"
+          begin="0"
+          end="360"               
+          vehsPerHour="10000"      
+          from="3_in"
+          to="4_out"
+          departLane="0"
+          departSpeed="0"/>      
+</routes>

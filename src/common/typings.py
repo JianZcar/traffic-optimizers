@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass, field
-from typing import Callable, List, Tuple, Optional
+from typing import Callable, List, Tuple, Optional, Dict
 
 
 @dataclass
@@ -29,38 +29,37 @@ class Approach:
 class Movement:
     """
     Represents a single allowed movement (from one approach to another).
-    Used for defining connections and flow parameters.
+    Fully identified by lane mapping.
     """
     from_approach: "Approach"
     to_approach: "Approach"
-    # 'straight', 'left', 'right', 'u-turn'
     movement_type: Optional[str] = None
     num_lanes: int = 1
-    average_flow: float = 100             # expected flow (veh/h)
+    average_flow: float = 100  # veh/h
     saturation_flow: Optional[float] = None
-    road_width: float = 3.2               # meters per lane
-    reaction_time: float = 1.0            # seconds
-    vehicle_speed: float = 13.9           # m/s (~50 km/h)
-    deceleration_rate: float = 4.5        # m/s^2
-    vehicle_length: float = 5             # meters
-    link_index: Optional[int] = None      # assigned later from connections.xml
-    lambda_rate: Optional[float] = None   # vehicles per second, derived
+    road_width: float = 3.2
+    reaction_time: float = 1.0
+    vehicle_speed: float = 13.9
+    deceleration_rate: float = 4.5
+    vehicle_length: float = 5
+
+    # ✅ New! Lane mapping stored directly
+    lane_map: Dict[int, int] = field(default_factory=dict)
+    # Example: {0: 0} meaning fromLane 0 connects to toLane 0
 
     def __post_init__(self):
-        # Derive lambda_rate from average_flow (veh/h → veh/s)
-        if self.lambda_rate is None:
-            self.lambda_rate = self.average_flow / 3600.0
+        # Compute λ = veh/s
+        self.lambda_rate = self.average_flow / 3600.0
 
-        # Auto-compute movement_type if not provided
+        # Auto classify turn if missing
         if self.movement_type is None:
             self.movement_type = self._classify_turn()
 
     def _classify_turn(self) -> str:
-        """Classify as left, right, straight, or u-turn based on approach angles."""
+        """Determine movement type based on approach angles."""
         from_angle = self.from_approach.angle
         to_angle = self.to_approach.angle
 
-        # Normalize difference to [-180, 180]
         diff = math.degrees((to_angle - from_angle + math.pi) %
                             (2 * math.pi) - math.pi)
 
@@ -70,8 +69,7 @@ class Movement:
             return "left"
         elif -150 < diff <= -30:
             return "right"
-        else:
-            return "u-turn"
+        return "u-turn"
 
 
 @dataclass

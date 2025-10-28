@@ -5,31 +5,36 @@ from collections import defaultdict
 from common.typings import Approach, Movement
 
 
-def attach_link_indices(connections_path: Path, movements: list[Movement]) -> None:
+def sync_lane_map_from_xml(connections_path: Path, movements: list[Movement]) -> None:
     """
-    Attach linkIndex values from connections.xml to Movement objects.
+    Load lane mapping from connections.xml and store into Movement.lane_map.
+    Ensures consistency between model + exported XML.
     """
     tree = ET.parse(connections_path)
     root = tree.getroot()
 
-    # Build dictionary: (from, to) -> linkIndex
-    link_mapping: dict[tuple[str, str], int] = {}
-    for conn in root.findall("connection"):
-        if "from" in conn.attrib and "to" in conn.attrib and "linkIndex" in conn.attrib:
-            from_edge = conn.attrib["from"]
-            to_edge = conn.attrib["to"]
-            link_index = int(conn.attrib["linkIndex"])
-            link_mapping[(from_edge, to_edge)] = link_index
+    # Build dictionary grouped by movement (from,to)
+    lane_mapping: dict[tuple[str, str], dict[int, int]] = defaultdict(dict)
 
-    # Update Movement objects in-place
-    for movement in movements:
-        key = (movement.from_approach.edge_id, movement.to_approach.edge_id)
-        if key in link_mapping:
-            movement.link_index = link_mapping[key]
-        else:
+    for conn in root.findall("connection"):
+        from_edge = conn.attrib["from"]
+        to_edge = conn.attrib["to"]
+        from_lane = int(conn.attrib["fromLane"])
+        to_lane = int(conn.attrib["toLane"])
+        lane_mapping[(from_edge, to_edge)][from_lane] = to_lane
+
+    # Assign to movement objects
+    for mv in movements:
+        key = (mv.from_approach.edge_id, mv.to_approach.edge_id)
+
+        if key not in lane_mapping:
             raise ValueError(
-                f"No linkIndex found for movement {key} in {connections_path}"
+                f"No lane connections found for movement {key} in {connections_path}"
             )
+
+        mv.lane_map = lane_mapping[key].copy()
+
+    print(f"✅ Lane mapping synchronized from {connections_path}")
 
 
 def allocate_lanes_per_approach(

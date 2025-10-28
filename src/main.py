@@ -13,51 +13,37 @@ from common.xml_generators import (
 )
 from common.run_baseline_sim import runBaseline
 from common.export_data import generate_traffic_report
-from common.utils import attach_link_indices
+from common.utils import sync_lane_map_from_xml
 from common.constants import BASE_NETWORK_PATH
 from common.intersection_builder import build_fixed_intersection
 
 intersection = build_fixed_intersection("T")
 build_intersection_sumo(intersection, BASE_NETWORK_PATH)
-attach_link_indices(BASE_NETWORK_PATH / "connections.xml", intersection.movements)
+sync_lane_map_from_xml(BASE_NETWORK_PATH / "connections.xml",
+                    intersection.movements)
 
-print("HEY")
+# pprint(f"Built Intersection: {intersection}")
 
 # # --- Run baseline & flows ---
 derive_saturation_flows(intersection)
-pprint(intersection)
-# runBaseline()
-# average_flows = get_average_flow()
 
-# --- Baseline SUMO run ---
-# subprocess.run(
-#     [
-#         "sumo",
-#         "-n", "data/net.xml",
-#         "-r", "data/routes.xml",
-#         "--tripinfo-output", "tripinfo.xml",
-#         "--queue-output", "q_.xml",
-#         "--verbose"
-#     ],
-#     check=True,
-#     capture_output=True,
-#     text=True
-# )
+# print(average_queue_length_per_edge("q_.xml"))
+# generate_traffic_report("tripinfo.xml", "Initial_traffic_bySUMO.png")
 
-print(average_queue_length_per_edge("q_.xml"))
-generate_traffic_report("tripinfo.xml", "Initial_traffic_bySUMO.png")
+# exit()
 
 # --- Generate population ---
 population = generate_population(size=1, movements=intersection.movements)
 pprint(f"Initial Population: {population}")
-
+exit()
 # --- Run Webster’s & GA ---
-generate_tl_logic(BASE_NETWORK_PATH / "connections.xml", "tl_logic.xml", population[0])
+generate_tl_logic(BASE_NETWORK_PATH / "connections.xml",
+                  "tl_logic.xml", population[0])
 
-result = subprocess.run(
+subprocess.run(
     [
         "sumo",
-        "-n", BASE_NETWORK_PATH / "net.xml",
+        "-n", BASE_NETWORK_PATH / "network.net.xml",
         "-r", BASE_NETWORK_PATH / "routes.xml",
         "--tripinfo-output", "tripinfo.xml",
         "--additional-files", "tl_logic.xml",
@@ -68,23 +54,18 @@ result = subprocess.run(
     text=True
 )
 
-if result.returncode != 0:
-    print("❌ SUMO failed with error:")
-    print(result.stderr)   # ← this is the key part
-else:
-    print("✅ SUMO ran successfully!")
-
 generate_traffic_report("tripinfo.xml", "Initial_traffic_byWebsters.png")
 
 pop = run_evolution(population)
 
-tl_xml = generate_tl_logic(BASE_NETWORK_PATH / "connections.xml", "tl_logic.xml", pop[0][0])
+tl_xml = generate_tl_logic(
+    BASE_NETWORK_PATH / "connections.xml", "tl_logic.xml", pop[0][0])
 
 subprocess.run(
     [
         "sumo",
-        "-n", "data/net.xml",
-        "-r", "data/routes.xml",
+        "-n", BASE_NETWORK_PATH / "network.net.xml",
+        "-r", BASE_NETWORK_PATH / "routes.xml",
         "--tripinfo-output", "tripinfo.xml",
         "--additional-files", "tl_logic.xml",
         "--verbose"

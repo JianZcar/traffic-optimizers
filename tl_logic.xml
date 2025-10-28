@@ -1,22 +1,22 @@
 <additional>
   <tlLogics version="1.16">
     <tlLogic id="J0" type="static" programID="1" offset="0">
-      <phase duration="5" state="Grrrrr"/>
+      <phase duration="3" state="Grrrrr"/>
       <phase duration="3" state="yrrrrr"/>
       <phase duration="1" state="rrrrrr"/>
-      <phase duration="3" state="rGrrrr"/>
+      <phase duration="4" state="rGrrrr"/>
       <phase duration="3" state="ryrrrr"/>
       <phase duration="1" state="rrrrrr"/>
-      <phase duration="2" state="rrGrrr"/>
+      <phase duration="4" state="rrGrrr"/>
       <phase duration="3" state="rryrrr"/>
       <phase duration="1" state="rrrrrr"/>
-      <phase duration="5" state="rrrGrr"/>
+      <phase duration="3" state="rrrGrr"/>
       <phase duration="3" state="rrryrr"/>
       <phase duration="1" state="rrrrrr"/>
-      <phase duration="2" state="rrrrGr"/>
+      <phase duration="4" state="rrrrGr"/>
       <phase duration="3" state="rrrryr"/>
       <phase duration="1" state="rrrrrr"/>
-      <phase duration="5" state="rrrrrG"/>
+      <phase duration="3" state="rrrrrG"/>
       <phase duration="3" state="rrrrry"/>
       <phase duration="1" state="rrrrrr"/>
     </tlLogic>

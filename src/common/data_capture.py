@@ -1,13 +1,15 @@
 import json
 import subprocess
 import xml.etree.ElementTree as ET
+from common.utils import allocate_lanes_per_approach
+from common.xml_generators import get_to_lane
 import traci
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Union, List, cast
+from typing import Dict, Union, List, cast, Optional
 from os import PathLike
 import shutil
-from common.typings import Movement, Intersection
+from common.typings import Movement, Intersection, SignalPhase
 from common.constants import BASE_NETWORK_PATH, SATURATION_ROOT_PATH, SATURATION_CACHE_FILE
 
 
@@ -24,91 +26,155 @@ def save_saturation_cache(cache: Dict[str, float]) -> None:
         json.dump(cache, f, indent=2)
 
 
-def movement_key(movement: Movement) -> str:
-    """Unique key for a movement (used for caching)."""
-    return f"{movement.from_approach.edge_id}->{movement.to_approach.edge_id}:{movement.num_lanes}"
-
-
-def setup_saturation_folder(movement: Movement, folder: Path) -> Path:
+def movement_key(movement: Movement, phase_id: Optional[str] = None) -> str:
     """
-    Create a dedicated folder for the movement and generate a high-demand route.
-    Returns path to the routes.xml.
+    Unique key for a movement in a given phase (used for caching).
+    If phase_id is None, defaults to just the movement.
     """
-    folder.mkdir(parents=True, exist_ok=True)
+    if phase_id:
+        return f"{movement.from_approach.edge_id}_{phase_id}->{movement.to_approach.edge_id}_{phase_id}"
+    return f"{movement.from_approach.edge_id}->{movement.to_approach.edge_id}"
 
-    # Copy base network files
-    for file_name in ["nodes.xml", "edges.xml", "connections.xml"]:
-        shutil.copy(BASE_NETWORK_PATH / file_name, folder / file_name)
 
-    # Generate routes.xml with high demand for the movement
-    routes_file = folder / "routes.xml"
-    with open(routes_file, "w") as f:
-        f.write(f"""<routes>
-    <vType id="car" accel="2.6" decel="4.5" sigma="0.5" length="5" minGap="2.5" maxSpeed="13.9"/>
-    <flow id="flow_{movement.from_approach.edge_id}_to_{movement.to_approach.edge_id}"
+def setup_saturation_folder(
+    movement: Movement,
+    folder: Path,
+    allocated_from_lanes: List[int]
+) -> Dict[int, Path]:
+    """
+    Create dedicated folders per allocated lane for the movement and generate
+    high-pressure demand routes for saturation flow measurement.
+    Returns a dictionary: {lane_idx: Path_to_routes.xml}.
+    """
+    lane_routes: Dict[int, Path] = {}
+
+    for lane_idx in allocated_from_lanes:
+        lane_folder = folder / f"lane_{lane_idx}"
+        lane_folder.mkdir(parents=True, exist_ok=True)
+
+        # Copy base network files
+        for file_name in ["nodes.xml", "edges.xml", "connections.xml"]:
+            shutil.copy(BASE_NETWORK_PATH / file_name, lane_folder / file_name)
+
+        # Create high-demand routes.xml for this lane
+        routes_file = lane_folder / "routes.xml"
+        with open(routes_file, "w") as f:
+            f.write(f"""<routes>
+    <vType id="car"
+           accel="2.6"
+           decel="4.5"
+           sigma="0.5"
+           length="5"
+           minGap="2.5"
+           maxSpeed="13.9"/>
+
+    <flow id="flow_{movement.from_approach.edge_id}_{lane_idx}_to_{movement.to_approach.edge_id}"
           type="car"
           begin="0"
-          end="3600"
-          number="10000"
+          end="360"               
+          vehsPerHour="10000"      
           from="{movement.from_approach.edge_id}"
-          to="{movement.to_approach.edge_id}"/>
+          to="{movement.to_approach.edge_id}"
+          departLane="{lane_idx}"
+          departSpeed="0"/>      
 </routes>""")
-    return routes_file
+
+        lane_routes[lane_idx] = routes_file
+
+    return lane_routes
 
 
-def run_saturation_simulation(movement: Movement, routes_path: Path) -> float:
+def run_saturation_simulation(
+    movement: Movement,
+    lane_idx: int,
+    routes_path: Path
+) -> float:
     """
-    Run SUMO for a single movement and compute per-lane saturation flow.
-    Uses caching so repeated calls return stored results.
+    Run SUMO for a single lane of a movement and compute its saturation flow.
+    Uses priority junctions (constant green) to simulate ideal conditions.
+    Returns saturation flow in veh/h for that lane.
     """
-    # --- check cache ---
+    # --- load cache ---
     cache = load_saturation_cache()
-    key = movement_key(movement)
+    key = movement_key(movement) + f"_{lane_idx}"
     if key in cache:
         return cache[key]
 
-    # --- build network ---
+    # --- patch network for priority junctions ---
     net_file = routes_path.parent / "network.net.xml"
+    nodes_file = routes_path.parent / "nodes.xml"
+
+    tree = ET.parse(nodes_file)
+    root = tree.getroot()
+    for junc in root.findall("junction"):
+        junc.attrib["type"] = "priority"
+    tree.write(nodes_file, encoding="utf-8", xml_declaration=True)
+
+    # --- convert network ---
     subprocess.run(
         [
             "netconvert",
-            "-n", str(routes_path.parent / "nodes.xml"),
+            "-n", str(nodes_file),
             "-e", str(routes_path.parent / "edges.xml"),
             "-x", str(routes_path.parent / "connections.xml"),
             "-o", str(net_file),
         ],
         check=True,
     )
+    # --- enforce all-green signal logic ---
+    tree = ET.parse(net_file)
+    root = tree.getroot()
 
+    for tl in root.findall("tlLogic"):
+        # Count total signals this tl controls
+        controlled_links = sum(
+            1
+            for _ in root.findall(
+                f"./connection[@tl='{tl.attrib['id']}']"
+            )
+        )
+
+        if controlled_links > 0:
+            all_green = "G" * controlled_links
+
+            # Overwrite any existing program/phases
+            for child in list(tl):
+                tl.remove(child)
+
+            ET.SubElement(
+                tl,
+                "phase",
+                attrib={"duration": "99999", "state": all_green}
+            )
+
+    tree.write(net_file, encoding="utf-8", xml_declaration=True)
+
+    # --- run SUMO ---
     traci.start(["sumo", "-n", str(net_file), "-r", str(routes_path)])
-
     try:
-        lane_ids = [f"{movement.from_approach.edge_id}_{i}" for i in range(
-            movement.from_approach.num_lanes)]
-        prev_seen: Dict[str, set] = {lane: set() for lane in lane_ids}
+        lane_id = f"{movement.from_approach.edge_id}_{lane_idx}"
+        prev_seen: set = set()
         total_passed = 0
 
         while cast(int, traci.simulation.getMinExpectedNumber()) > 0:
             traci.simulationStep()
-            for lane in lane_ids:
-                current = set(traci.lane.getLastStepVehicleIDs(lane))
-                # new vehicles = those in current but not seen before
-                new = current - prev_seen[lane]
-                total_passed += len(new)
-                prev_seen[lane] |= new  # mark them as seen
+            current = set(traci.lane.getLastStepVehicleIDs(lane_id))
+            new = current - prev_seen
+            total_passed += len(new)
+            prev_seen |= new
 
         sim_time: float = cast(float, traci.simulation.getTime())
         if sim_time <= 0:
             raise RuntimeError("Simulation time is zero")
 
-        # veh/h/lane
-        result = (total_passed / sim_time) * 3600
+        # veh/h for this lane
+        saturation_flow = (total_passed/sim_time) * 3600.0
 
-        # --- save to cache ---
-        cache[key] = result
+        # --- cache ---
+        cache[key] = saturation_flow
         save_saturation_cache(cache)
 
-        return result
+        return saturation_flow
 
     finally:
         traci.close()
@@ -116,26 +182,48 @@ def run_saturation_simulation(movement: Movement, routes_path: Path) -> float:
 
 def derive_saturation_flows(intersection: Intersection):
     """
-    Loop through all movements, run dedicated simulations (if needed),
-    and compute saturation flows. Uses cache when available.
+    Loop through all movements, run dedicated simulations per lane using allocated lanes,
+    and compute per-lane saturation flows. Uses cache when available.
     """
     saturation_root = Path("data/saturation")
     cache = load_saturation_cache()
+    used_lanes: Dict[str, set] = defaultdict(set)
 
-    for m in intersection.movements:
-        key = movement_key(m)
+    # Group movements by from_approach
+    by_from = defaultdict(list)
+    for mv in intersection.movements:
+        by_from[mv.from_approach.edge_id].append(mv)
 
-        if key in cache:
-            m.saturation_flow = cache[key]
-            print(
-                f"[CACHE] {m.from_approach.name} -> {m.to_approach.name}: {m.saturation_flow:.1f} veh/h/lane")
-        else:
+    for from_edge_id, movements in by_from.items():
+        approach = movements[0].from_approach
+        allocations = allocate_lanes_per_approach(
+            from_edge_id, movements, approach.num_lanes, used_lanes
+        )
+
+        for mv, allocated_from_lanes in allocations:
             folder = saturation_root / \
-                f"{m.from_approach.edge_id}_to_{m.to_approach.edge_id}"
-            routes_path = setup_saturation_folder(m, folder)
-            m.saturation_flow = run_saturation_simulation(m, routes_path)
-            print(
-                f"[SIMULATED] {m.from_approach.name} -> {m.to_approach.name}: {m.saturation_flow:.1f} veh/h/lane")
+                f"{mv.from_approach.edge_id}_to_{mv.to_approach.edge_id}"
+            lane_routes = setup_saturation_folder(
+                mv, folder, allocated_from_lanes)
+
+            # Run simulation per lane
+            per_lane_saturation = {}
+            for lane_idx, routes_path in lane_routes.items():
+                key = movement_key(mv, phase_id=str(lane_idx))
+                if key in cache:
+                    sat = cache[key]
+                else:
+                    sat = run_saturation_simulation(
+                        mv, lane_idx, routes_path)
+                    cache[key] = sat
+                    save_saturation_cache(cache)
+                per_lane_saturation[lane_idx] = sat
+                print(
+                    f"[LANE {lane_idx}] {mv.from_approach.name} -> {mv.to_approach.name}: {sat:.1f} veh/h/lane")
+
+            # Optional: store average for the movement
+            mv.saturation_flow = sum(
+                per_lane_saturation.values()) / len(per_lane_saturation)
 
 
 def get_all_incoming_edges(routes_path: Union[str, PathLike[str]]) -> list[str]:

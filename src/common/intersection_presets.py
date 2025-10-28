@@ -2,12 +2,12 @@ T_INTERSECTION = {
     "name": "T-Intersection",
     "type": "T",
     "approaches": [
-        {"name": "1_in", "x": 0.0, "y": 100, "edge_id": "1_in", "num_lanes": 2},
-        {"name": "1_out", "x": 0.0, "y": 100, "edge_id": "1_out", "num_lanes": 2},
-        {"name": "3_in", "x": 0.0, "y": -100, "edge_id": "3_in", "num_lanes": 2},
-        {"name": "3_out", "x": 0.0, "y": -100, "edge_id": "3_out", "num_lanes": 2},
-        {"name": "4_in", "x": -150, "y": 0.0, "edge_id": "4_in", "num_lanes": 2},
-        {"name": "4_out", "x": -150, "y": 0.0, "edge_id": "4_out", "num_lanes": 2},
+        {"name": "1_in", "x": 0.0, "y": 250, "edge_id": "1_in", "num_lanes": 2},
+        {"name": "1_out", "x": 0.0, "y": 250, "edge_id": "1_out", "num_lanes": 2},
+        {"name": "3_in", "x": 0.0, "y": -250, "edge_id": "3_in", "num_lanes": 2},
+        {"name": "3_out", "x": 0.0, "y": -250, "edge_id": "3_out", "num_lanes": 2},
+        {"name": "4_in", "x": -250, "y": 0.0, "edge_id": "4_in", "num_lanes": 2},
+        {"name": "4_out", "x": -250, "y": 0.0, "edge_id": "4_out", "num_lanes": 2},
     ],
     "movements": [
         {"from_edge": "1_in", "to_edge": "3_out",

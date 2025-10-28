@@ -111,10 +111,9 @@ def get_to_lane(mv: "Movement", num_to: int, used_lanes: Dict[str, Set[int]]) ->
 def build_connections_xml(intersection, output_path: Path, tl_id: str = "J0") -> None:
     """
     Build SUMO <connections> XML for T/X intersections.
-    Fully deterministic, no balancing maps, no fill_missing_connections.
+    Lane mapping (fromLane → toLane) is written into Movement.lane_map here.
     """
     root = ET.Element("connections")
-    link_index = 0
     preview_lines = []
 
     # Group movements by from_approach.edge_id
@@ -137,41 +136,44 @@ def build_connections_xml(intersection, output_path: Path, tl_id: str = "J0") ->
         )
 
         for mv, from_lanes in allocations:
-            num_to_lanes = max(1, int(mv.to_approach.num_lanes))
-            to_lane = get_to_lane(mv, num_to_lanes, used_lanes)
-
+            num_to_lanes = mv.to_approach.num_lanes
             for from_lane in from_lanes:
+                # Decide the toLane for this specific mapping
+                to_lane = get_to_lane(mv, num_to_lanes, used_lanes)
+
+                # ✅ Assign mapping into the Movement object
+                mv.lane_map[from_lane] = to_lane
+
+                # ✅ Also mark lane used
+                used_lanes[mv.to_approach.edge_id].add(to_lane)
+
+                # ✅ Write XML using assigned mapping
                 ET.SubElement(
-                    root,
-                    "connection",
+                    root, "connection",
                     {
                         "from": mv.from_approach.edge_id,
                         "to": mv.to_approach.edge_id,
                         "fromLane": str(from_lane),
                         "toLane": str(to_lane),
                         "tl": tl_id,
-                        "linkIndex": str(link_index),
-                    },
+                    }
                 )
+
                 preview_lines.append(
                     f"{mv.from_approach.edge_id}_{from_lane} → "
                     f"{mv.to_approach.edge_id}_{to_lane} ({mv.movement_type})"
                 )
-                link_index += 1
 
-    # Print preview
-    print("\n=== Connection Allocation Preview ===")
+    print("\n=== Final Lane Map Preview ===")
     for line in preview_lines:
         print(line)
     print("====================================\n")
 
-    # Write XML
     ET.ElementTree(root).write(
         output_path, encoding="utf-8", xml_declaration=True)
 
+
 # ---------------- Routes ----------------
-
-
 def build_routes_xml(intersection: Intersection, output_path: Path) -> None:
     """
     Generate routes.xml with flows for each movement.

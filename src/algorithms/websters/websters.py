@@ -205,20 +205,16 @@ def compute_signal_config_with_poisson(
 def build_sumo_tl_states(configs: SignalPlan, phases: List[Movement]) -> List[dict]:
     """
     Merge SignalPlan into SUMO-compatible tlLogic states.
-    Uses link_index from Movement to build the state string.
+    Uses link_index from SignalPhase to build the state string.
     """
     # total number of links = max link_index + 1
     total_links = max(
-        p.link_index for p in phases if p.link_index is not None) + 1
+        cfg.link_index for cfg in configs if cfg.link_index is not None) + 1
     events = []
-
-    # Map configs back to phases (to access link_index)
-    cfg_to_phase = {(c.from_approach, c.to_approach): p for c, p in zip(configs, phases)}
 
     # Collect all start/transition times
     for cfg in configs:
-        phase = cfg_to_phase[(cfg.from_approach, cfg.to_approach)]
-        li = phase.link_index
+        li = cfg.link_index
         events.extend([
             (cfg.start, li, "G"),
             (cfg.start + cfg.green, li, "y"),
@@ -238,8 +234,8 @@ def build_sumo_tl_states(configs: SignalPlan, phases: List[Movement]) -> List[di
                 "end": t,
                 "duration": t - last_t,
                 "state": "".join(state),
-                "from": phases[li].from_approach.name,
-                "to": phases[li].to_approach.name,
+                "from": configs[li].from_approach,
+                "to": configs[li].to_approach,
             })
         state[li] = new_char
         last_t = t
