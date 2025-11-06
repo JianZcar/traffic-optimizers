@@ -1,13 +1,13 @@
 <additional>
   <tlLogics version="1.16">
     <tlLogic id="J0" type="static" programID="1" offset="0">
-      <phase duration="3" state="Grrrrr"/>
-      <phase duration="3" state="yrrrrr"/>
-      <phase duration="1" state="rrrrrr"/>
-      <phase duration="4" state="rGrrrr"/>
+      <phase duration="3" state="rGrrrr"/>
       <phase duration="3" state="ryrrrr"/>
       <phase duration="1" state="rrrrrr"/>
-      <phase duration="4" state="rrGrrr"/>
+      <phase duration="4" state="Grrrrr"/>
+      <phase duration="3" state="yrrrrr"/>
+      <phase duration="1" state="rrrrrr"/>
+      <phase duration="3" state="rrGrrr"/>
       <phase duration="3" state="rryrrr"/>
       <phase duration="1" state="rrrrrr"/>
       <phase duration="3" state="rrrGrr"/>

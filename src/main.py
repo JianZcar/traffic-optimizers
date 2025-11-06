@@ -66,8 +66,7 @@ pprint(f"Initial Population: {population}")
 # =====================================================
 
 # Generate Webster’s signal timing plan into SUMO TL logic XML
-generate_tl_logic(BASE_NETWORK_PATH / "connections.xml",
-                  "tl_logic.xml", population[0])
+generate_tl_logic(BASE_NETWORK_PATH / "network.net.xml", "tl_logic.xml", population[0])
 
 # Run SUMO simulation using Webster’s plan
 subprocess.run(

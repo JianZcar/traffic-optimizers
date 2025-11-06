@@ -6,6 +6,8 @@ import tempfile
 from pathlib import Path
 import subprocess
 
+from pprint import pprint
+
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import List, Dict
@@ -115,8 +117,8 @@ def build_connections_xml(intersection, output_path: Path, tl_id: str = "J0") ->
     """
     root = ET.Element("connections")
     preview_lines = []
+    link_index = 0  # 🔹 We'll increment this manually
 
-    # Group movements by from_approach.edge_id
     by_from = {}
     for mv in intersection.movements:
         by_from.setdefault(mv.from_approach.edge_id, []).append(mv)
@@ -138,16 +140,14 @@ def build_connections_xml(intersection, output_path: Path, tl_id: str = "J0") ->
         for mv, from_lanes in allocations:
             num_to_lanes = mv.to_approach.num_lanes
             for from_lane in from_lanes:
-                # Decide the toLane for this specific mapping
                 to_lane = get_to_lane(mv, num_to_lanes, used_lanes)
-
-                # ✅ Assign mapping into the Movement object
                 mv.lane_map[from_lane] = to_lane
-
-                # ✅ Also mark lane used
                 used_lanes[mv.to_approach.edge_id].add(to_lane)
 
-                # ✅ Write XML using assigned mapping
+                # ✅ Assign a linkIndex and attach to Movement
+                mv.link_index = link_index
+
+                # ✅ Write XML using assigned linkIndex
                 ET.SubElement(
                     root, "connection",
                     {
@@ -156,12 +156,15 @@ def build_connections_xml(intersection, output_path: Path, tl_id: str = "J0") ->
                         "fromLane": str(from_lane),
                         "toLane": str(to_lane),
                         "tl": tl_id,
+                        "linkIndex": str(link_index),  # 🔹 Added here
                     }
                 )
+                link_index += 1
 
                 preview_lines.append(
                     f"{mv.from_approach.edge_id}_{from_lane} → "
-                    f"{mv.to_approach.edge_id}_{to_lane} ({mv.movement_type})"
+                    f"{mv.to_approach.edge_id}_{to_lane} "
+                    f"({mv.movement_type}, linkIndex={mv.link_index})"
                 )
 
     print("\n=== Final Lane Map Preview ===")
@@ -253,61 +256,96 @@ def generate_tl_logic(
 ) -> None:
     """
     Generate a tlLogic XML for SUMO based on a SignalPlan.
-    Supports multi-lane movements by applying green/yellow to all linkIndices
-    belonging to each movement in a phase.
+    Supports multi-lane movements by using lane_map to look up
+    corresponding linkIndex values from connections.xml.
     """
-    # Parse input XML (connections.xml)
+
+    print(f"[DEBUG] Parsing connections file: {connections_path}")
     tree = ET.parse(connections_path)
     root = tree.getroot()
 
-    # Collect all traffic-light-controlled connections
+    # Collect all connections with tl + linkIndex attributes
     connections = [
         conn for conn in root.findall("connection")
         if "tl" in conn.attrib and "linkIndex" in conn.attrib
     ]
     total_links = len(connections)
+    print(f"[DEBUG] Total tl-controlled connections found: {total_links}")
+    print("[DEBUG] Sample connections (first 5):")
+    for conn in connections[:5]:
+        print("  ", conn.attrib)
 
-    # Build tlLogic phases
+    # Helper: find linkIndex from lane_map and approaches
+    def find_link_index(from_edge: str, to_edge: str, from_lane: int, to_lane: int):
+        for conn in connections:
+            if (conn.attrib.get("from") == from_edge and
+                conn.attrib.get("to") == to_edge and
+                int(conn.attrib.get("fromLane", -1)) == from_lane and
+                    int(conn.attrib.get("toLane", -1)) == to_lane):
+                return int(conn.attrib["linkIndex"])
+        return None
+
+    # --- Build tlLogic phases ---
     phases_xml = []
-    for phase in signal_plan:
-        # --- Green phase ---
-        state = ["r"] * total_links
-        for movement in phase.movements:
-            if movement.link_index is None:
-                raise ValueError(
-                    f"Movement {movement} has no link_index assigned")
 
-            # Each lane of the movement maps to a consecutive linkIndex
-            for lane_offset in range(movement.num_lanes):
-                idx = movement.link_index + lane_offset
-                if idx >= total_links:
-                    raise IndexError(
-                        f"linkIndex {idx} out of range for {movement}")
-                state[idx] = "G"
+    for phase_idx, phase in enumerate(signal_plan):
+        print(
+            f"\n[DEBUG] Processing phase {phase_idx}: {phase.from_approach}->{phase.to_approach}")
+        state = ["r"] * total_links
+
+        # GREEN PHASE
+        for mov_idx, movement in enumerate(phase.movements):
+            print(f"  [DEBUG] Movement {mov_idx}: {movement.from_approach.name}->{movement.to_approach.name}, "
+                  f"lane_map={movement.lane_map}")
+
+            for from_lane, to_lane in movement.lane_map.items():
+                link_index = find_link_index(
+                    movement.from_approach.edge_id,
+                    movement.to_approach.edge_id,
+                    from_lane,
+                    to_lane
+                )
+
+                if link_index is None:
+                    print(f"  [WARN] No linkIndex found for {movement.from_approach.edge_id}->{movement.to_approach.edge_id} "
+                          f"(lane {from_lane}->{to_lane}) — skipping")
+                    continue
+
+                if link_index >= total_links:
+                    print(
+                        f"  [ERROR] linkIndex {link_index} out of range (total_links={total_links})")
+                    continue
+
+                print(f"    [DEBUG] Setting GREEN at linkIndex={link_index}")
+                state[link_index] = "G"
 
         phases_xml.append(
             f'''      <phase duration="{phase.green}" state="{"".join(state)}"/>'''
         )
 
-        # --- Amber phase ---
+        # AMBER PHASE
         state = ["r"] * total_links
         for movement in phase.movements:
-            if movement.link_index is not None:
-                for lane_offset in range(movement.num_lanes):
-                    idx = movement.link_index + lane_offset
-                    state[idx] = "y"
+            for from_lane, to_lane in movement.lane_map.items():
+                link_index = find_link_index(
+                    movement.from_approach.edge_id,
+                    movement.to_approach.edge_id,
+                    from_lane,
+                    to_lane
+                )
+                if link_index is not None and link_index < total_links:
+                    state[link_index] = "y"
 
         phases_xml.append(
             f'''      <phase duration="{phase.amber}" state="{"".join(state)}"/>'''
         )
 
-        # --- All-red phase ---
-        state = ["r"] * total_links
+        # ALL-RED PHASE
         phases_xml.append(
-            f'''      <phase duration="{phase.all_red}" state="{"".join(state)}"/>'''
+            f'''      <phase duration="{phase.all_red}" state="{"r" * total_links}"/>'''
         )
 
-    # Wrap in tlLogic
+    # --- Final wrap ---
     output_xml = f'''<additional>
   <tlLogics version="1.16">
     <tlLogic id="{tl_id}" type="static" programID="1" offset="0">
@@ -319,8 +357,11 @@ def generate_tl_logic(
     with open(output_path, "w") as f:
         f.write(output_xml)
 
+    print(f"\n[DEBUG] tlLogic XML successfully written to {output_path}")
 
 # -------------------- Saturation Flow Scenario --------------------
+
+
 def saturation_flow_scenario() -> Tuple[Path, str]:
     """
     Create a simple routes.xml to test saturation flow rates.
