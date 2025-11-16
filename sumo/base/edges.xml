@@ -1,2 +1,9 @@
-<?xml version='1.0' encoding='utf-8'?>
-<edges><edge id="1_in" numLanes="2" speed="13.9" from="1_in_node" to="J0" /><edge id="1_out" numLanes="2" speed="13.9" from="J0" to="1_out_node" /><edge id="3_in" numLanes="2" speed="13.9" from="3_in_node" to="J0" /><edge id="3_out" numLanes="2" speed="13.9" from="J0" to="3_out_node" /><edge id="4_in" numLanes="2" speed="13.9" from="4_in_node" to="J0" /><edge id="4_out" numLanes="2" speed="13.9" from="J0" to="4_out_node" /></edges>
+<?xml version="1.0" ?>
+<edges>
+  <edge id="1_in" numLanes="2" speed="13.9" from="1_in_node" to="J0"/>
+  <edge id="1_out" numLanes="2" speed="13.9" from="J0" to="1_out_node"/>
+  <edge id="3_in" numLanes="2" speed="13.9" from="3_in_node" to="J0"/>
+  <edge id="3_out" numLanes="2" speed="13.9" from="J0" to="3_out_node"/>
+  <edge id="4_in" numLanes="2" speed="13.9" from="4_in_node" to="J0"/>
+  <edge id="4_out" numLanes="2" speed="13.9" from="J0" to="4_out_node"/>
+</edges>

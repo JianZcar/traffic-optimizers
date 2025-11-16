@@ -1,2 +1,12 @@
-<?xml version='1.0' encoding='utf-8'?>
-<routes><vType id="car" accel="2.5" decel="4.5" maxSpeed="13.89" length="5" /><flow id="flow_1_in_to_3_out" from="1_in" to="3_out" begin="0" end="3600" number="500" /><flow id="flow_1_in_to_4_out" from="1_in" to="4_out" begin="0" end="3600" number="400" /><flow id="flow_3_in_to_1_out" from="3_in" to="1_out" begin="0" end="3600" number="600" /><flow id="flow_3_in_to_4_out" from="3_in" to="4_out" begin="0" end="3600" number="350" /><flow id="flow_4_in_to_3_out" from="4_in" to="3_out" begin="0" end="3600" number="450" /><flow id="flow_4_in_to_1_out" from="4_in" to="1_out" begin="0" end="3600" number="300" /></routes>
+<?xml version="1.0" ?>
+<routes>
+  <vType id="car" accel="2.5" decel="4.5" length="5" maxSpeed="13.89"/>
+  <flow id="flow_1_in_to_3_out_lane0" from="1_in" to="3_out" begin="0" end="3600" number="422"/>
+  <flow id="flow_1_in_to_3_out_lane1" from="1_in" to="3_out" begin="0" end="3600" number="422"/>
+  <flow id="flow_1_in_to_4_out_lane0" from="1_in" to="4_out" begin="0" end="3600" number="101"/>
+  <flow id="flow_3_in_to_1_out_lane0" from="3_in" to="1_out" begin="0" end="3600" number="414"/>
+  <flow id="flow_3_in_to_1_out_lane1" from="3_in" to="1_out" begin="0" end="3600" number="414"/>
+  <flow id="flow_3_in_to_4_out_lane1" from="3_in" to="4_out" begin="0" end="3600" number="269"/>
+  <flow id="flow_4_in_to_1_out_lane1" from="4_in" to="1_out" begin="0" end="3600" number="94"/>
+  <flow id="flow_4_in_to_3_out_lane0" from="4_in" to="3_out" begin="0" end="3600" number="339"/>
+</routes>
