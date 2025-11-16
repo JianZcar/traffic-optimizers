@@ -1,108 +1,251 @@
 import subprocess
-import os
-from algorithms.ga import generate_population, run_evolution
-from algorithms.websters import websters_method
-from common.data_capture import get_average_flow, get_saturation_flow, average_queue_length_per_edge
-from common.typings import IntersectionParams
-from common.xml_generators import generate_tl_logic
-from common.run_baseline_sim import runBaseline
-from common.export_data import generate_traffic_report
+import copy
+import tempfile
+import shutil
+from pathlib import Path
 from pprint import pprint
+import documentation
+from custom_typings import SignalPhase, SignalPlan
+from intersections.T_shape import intersection as T_intersection
+from intersections.T_shape import signal_plan as T_signal_plan
+from constants import DOCUMENTATION_PATH, BASE_NETWORK_PATH, ORIGINAL_BASELINE_PATH, WEBSTERS_PATH, GA_ENHANCED_PATH
+from sumo_functions import (generate_connections_xml,
+                            generate_edges_xml,
+                            generate_routes_xml,
+                            generate_nodes_xml,
+                            generate_traffic_lights_xml,
+                            create_sumo_config,
+                            generate_viewsettings_xml)
+from sumo_report import display_report, generate_report, run_sumo, display_signal_plan
+from algorithms.websters import compute_signal_config_with_poisson_and_websters
+from algorithms.ga import generate_population, run_evolution
 
-# Main CLI
-saturation_flow = get_saturation_flow()
-runBaseline()
-average_flows = get_average_flow()
 
-subprocess.run(
-    [
+if __name__ == "__main__":
+    for path in [DOCUMENTATION_PATH, BASE_NETWORK_PATH, ORIGINAL_BASELINE_PATH, WEBSTERS_PATH, GA_ENHANCED_PATH]:
+        path.mkdir(parents=True, exist_ok=True)
+
+    # --- PSU TINIGUIBAN CURRENT CONFIGURATION ---
+    # Change the light configurations to reflect the actual configuration observed by Jovan
+    T_signal_plan_copy = T_signal_plan.copy()
+
+    phase_1: SignalPhase = T_signal_plan_copy[0]
+    phase_1.green = 68.0
+    phase_1.amber = 3.0
+    phase_1.all_red = 3.0
+    phase_1.start = 0.0
+    phase_1.duration = phase_1.green + phase_1.amber + phase_1.all_red
+
+    phase_2: SignalPhase = T_signal_plan_copy[1]
+    phase_2.green = 32.0
+    phase_2.amber = 3.0
+    phase_2.all_red = 3.0
+    phase_2.start = phase_1.duration
+    phase_2.duration = phase_2.green + phase_2.amber + phase_2.all_red
+
+    phase_3: SignalPhase = T_signal_plan_copy[2]
+    phase_3.green = 28.0
+    phase_3.amber = 3.0
+    phase_3.all_red = 3.0
+    phase_3.start = phase_2.start + phase_2.duration
+    phase_3.duration = phase_3.green + phase_3.amber + phase_3.all_red
+
+    PSU_signal_plan: SignalPlan = [phase_1, phase_2, phase_3]
+
+    # --- BUILDING THE INTERSECTION IN SUMO ---
+    base_nodes_path = BASE_NETWORK_PATH / "nodes.xml"
+    base_edges_path = BASE_NETWORK_PATH / "edges.xml"
+    base_connections_path = BASE_NETWORK_PATH / "connections.xml"
+    base_routes_path = BASE_NETWORK_PATH / "routes.xml"
+    base_net_path = BASE_NETWORK_PATH / "network.net.xml"
+    base_gui_settings_path = BASE_NETWORK_PATH / "viewsettings.xml"
+
+    generate_nodes_xml(T_intersection, base_nodes_path)
+    generate_edges_xml(T_intersection, base_edges_path)
+    generate_connections_xml(T_intersection, base_connections_path)
+    generate_routes_xml(T_intersection, base_routes_path)
+
+    # --- GUI SETTINGS ---
+    generate_viewsettings_xml(output_path=base_gui_settings_path)
+
+    subprocess.run([
         "netconvert",
-        "-n", "data/nodes.xml",
-        "-e", "data/edges.xml",
-        "-x", "data/connections.xml",
-        "-o", "data/net.xml",
-        "--verbose"
-    ],
-    check=True,       # raises if SUMO exits non-zero
-    capture_output=True,
-    text=True
-)
+        "--node-files", str(base_nodes_path),
+        "--edge-files", str(base_edges_path),
+        "--connection-files", str(base_connections_path),
+        "--output-file", str(base_net_path)
+    ], check=True)
 
-subprocess.run(
-    [
-        "sumo",
-        "-n", "data/net.xml",
-        "-r", "data/routes.xml",
-        "--tripinfo-output", "tripinfo.xml",
-        "--queue-output", "q_.xml",
-        "--verbose"
-    ],
-    check=True,       # raises if SUMO exits non-zero
-    capture_output=True,
-    text=True
-)
+    # SIMULATE ORIGINAL SETUP AND GENERATE REPORT
+    original_sumo_config_path = ORIGINAL_BASELINE_PATH / "simulation.sumocfg"
+    original_tls_path = ORIGINAL_BASELINE_PATH / "traffic_light_signal.tls.xml"
 
-print(average_queue_length_per_edge("q_.xml"))
-generate_traffic_report("tripinfo.xml", "Initial_traffic_bySUMO.png")
+    generate_traffic_lights_xml(signal_plan=PSU_signal_plan,
+                                net_path=base_net_path,
+                                output_path=original_tls_path)
 
-intersection_params = IntersectionParams(
-    saturation_flows=[saturation_flow, saturation_flow,
-                      saturation_flow, saturation_flow],
-    lambda_rates=[round(average_flows['W_in']/60, 2),
-                  round(average_flows['E_in']/60, 2), round(average_flows['N_in']/60, 2)],
-    reaction_time=1.0,                    # s
-    road_widths=[3.2, 3.2, 3.2, 3.2],          # m
-    vehicle_speed=13.89,                  # m/s
-    deceleration_rate=4.5,                # m/s^2
-    vehicle_length=5                      # m
-)
+    create_sumo_config(
+        routes_path=base_routes_path,
+        net_path=base_net_path,
+        tls_path=original_tls_path,
+        output_path=original_sumo_config_path
+    )
 
-population = generate_population(
-    size=20, intersection_params=intersection_params)
+    print(f"SUMO CONFIG: {str(original_sumo_config_path)}")
 
-pprint(population)
+    original_tripinfo_path = ORIGINAL_BASELINE_PATH / "tripinfo.xml"
+    original_detector_path = ORIGINAL_BASELINE_PATH / "detectors.xml"
+    original_report_path = ORIGINAL_BASELINE_PATH / "report.json"
 
-generate_tl_logic('data/connections.xml', "tl_logic.xml", population[0])
+    run_sumo(
+        net_file=str(base_net_path),
+        sumocfg_path=str(original_sumo_config_path),
+        tripinfo_out=str(original_tripinfo_path),
+        detector_out=str(original_detector_path),
+        tls_path=str(original_tls_path)
+    )
 
-subprocess.run(
-    [
-        "sumo",
-        "-n", "data/net.xml",
-        "-r", "data/routes.xml",
-        "--tripinfo-output", "tripinfo.xml",
-        "--additional-files", "tl_logic.xml",
-        "--verbose"
-    ],
-    check=True,       # raises if SUMO exits non-zero
-    capture_output=True,
-    text=True
-)
+    original_report = generate_report(
+        intersection=T_intersection,
+        tripinfo_path=str(original_tripinfo_path),
+        detector_path=str(original_detector_path),
+        base_dir=ORIGINAL_BASELINE_PATH,
+        save_json=str(original_report_path)
+    )
 
-generate_traffic_report("tripinfo.xml", "Initial_traffic_byWebsters.png")
+    display_report(original_report, header="ORIGINAL SETUP (PSU)")
 
-pop = run_evolution(population)
+    # TODO: GENERATE INITIAL POPULATIONS FOR GENETIC ALGORITHM BASED USING MODIFIED WEBSTER'S METHOD
+    population = generate_population(20, copy.deepcopy(T_signal_plan))
 
-tl_xml = generate_tl_logic('data/connections.xml', "tl_logic.xml", pop[0][0])
+    best_fitness = 9999
+    best_signal_plan: SignalPlan | None = None
 
-subprocess.run(
-    [
-        "sumo",
-        "-n", "data/net.xml",
-        "-r", "data/routes.xml",
-        "--tripinfo-output", "tripinfo.xml",
-        "--additional-files", "tl_logic.xml",
-        "--verbose"
-    ],
-    check=True,       # raises if SUMO exits non-zero
-    capture_output=True,
-    text=True
-)
+    # Define the final paths to store the best individual
+    websters_sumo_config_path = WEBSTERS_PATH / "simulation.sumocfg"
+    websters_tls_path = WEBSTERS_PATH / "traffic_light_signal.tls.xml"
+    websters_tripinfo_path = WEBSTERS_PATH / "tripinfo.xml"
+    websters_detector_path = WEBSTERS_PATH / "detectors.xml"
+    websters_report_path = WEBSTERS_PATH / "report.json"
 
-generate_traffic_report("tripinfo.xml", "finalGA.png")
-print("Initial Websters")
-# population.sort(key=lambda config: fitness(config))
-print(population[0])
+    # TODO: RUN INITIAL POPULATION TO DETERMINE BEST PERFORMING BASELINE
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        tmp_sumocfg = tmp_path / "simulation.sumocfg"
+        tmp_tls = tmp_path / "traffic_light_signal_tls.xml"
+        tmp_tripinfo = tmp_path / "tripinfo.xml"
+        tmp_detector = tmp_path / "detectors.xml"
+        tmp_report = tmp_path / "report.json"
 
+        for idx, signal_plan in enumerate(population):
+            # Generate TLS and SUMO config in temp folder
+            generate_traffic_lights_xml(signal_plan=signal_plan,
+                                        net_path=base_net_path,
+                                        output_path=tmp_tls)
 
-print("Final GA")
-print(pop[0][0])
+            create_sumo_config(
+                routes_path=base_routes_path,
+                net_path=base_net_path,
+                tls_path=tmp_tls,
+                output_path=tmp_sumocfg,
+                gui_settings_path=base_gui_settings_path
+            )
+
+            # Run SUMO
+            run_sumo(
+                net_file=str(base_net_path),
+                sumocfg_path=str(tmp_sumocfg),
+                tripinfo_out=str(tmp_tripinfo),
+                detector_out=str(tmp_detector),
+                tls_path=str(tmp_tls)
+            )
+
+            # Generate report
+            report = generate_report(
+                intersection=T_intersection,
+                tripinfo_path=str(tmp_tripinfo),
+                detector_path=str(tmp_detector),
+                base_dir=tmp_path,
+                save_json=str(tmp_report)
+            )
+
+            # Track best fitness
+            if report["fitness_score"] < best_fitness:
+                best_fitness = report["fitness_score"]
+                best_signal_plan = copy.deepcopy(signal_plan)
+
+    # TODO: GENERATE REPORT FOR THE BASELINE PERFORMANCE
+    create_sumo_config(
+        routes_path=base_routes_path,
+        net_path=base_net_path,
+        tls_path=websters_tls_path,
+        output_path=websters_sumo_config_path,
+        gui_settings_path=base_gui_settings_path
+    )
+
+    run_sumo(
+        net_file=str(base_net_path),
+        sumocfg_path=str(websters_sumo_config_path),
+        tripinfo_out=str(websters_tripinfo_path),
+        detector_out=str(websters_detector_path),
+        tls_path=str(websters_tls_path)
+    )
+
+    websters_report = generate_report(
+        intersection=T_intersection,
+        tripinfo_path=websters_tripinfo_path,
+        detector_path=websters_detector_path,
+        base_dir=WEBSTERS_PATH,
+        save_json=websters_report_path
+    )
+
+    display_report(websters_report, header="WEBSTER BASELINE")
+
+    # TODO: RUN GENETIC ALGORITHM TO OPTIMIZE THE TRAFFIC LIGHT TIMINGS
+    final_plans, generation = run_evolution(
+        intersection=T_intersection,
+        signal_plan_template=copy.deepcopy(T_signal_plan),
+        population=population,
+        routes_path=base_routes_path,
+        net_path=base_net_path,
+    )
+
+    ga_enhanced_signal_plan = final_plans[0]
+    ga_enhanced_sumo_config_path = GA_ENHANCED_PATH / "simulation.sumocfg"
+    ga_enhanced_tls_path = GA_ENHANCED_PATH / "traffic_light_signal.tls.xml"
+    ga_enhanced_tripinfo_path = GA_ENHANCED_PATH / "tripinfo.xml"
+    ga_enhanced_detector_path = GA_ENHANCED_PATH / "detectors.xml"
+    ga_enhaced_report_path = GA_ENHANCED_PATH / "report.xml"
+
+    generate_traffic_lights_xml(signal_plan=ga_enhanced_signal_plan,
+                                net_path=base_net_path, output_path=ga_enhanced_tls_path)
+
+    # TODO: GENERATE REPORT FOR THE OPTIMIZED PERFORMANCE AFTER GA
+    create_sumo_config(
+        routes_path=base_routes_path,
+        net_path=base_net_path,
+        tls_path=ga_enhanced_tls_path,
+        output_path=ga_enhanced_sumo_config_path,
+        gui_settings_path=base_gui_settings_path
+    )
+
+    run_sumo(
+        net_file=str(base_net_path),
+        sumocfg_path=str(ga_enhanced_sumo_config_path),
+        tripinfo_out=str(ga_enhanced_tripinfo_path),
+        detector_out=str(ga_enhanced_detector_path),
+        tls_path=str(ga_enhanced_tls_path)
+    )
+
+    ga_enhnaced_report = generate_report(
+        intersection=T_intersection,
+        tripinfo_path=ga_enhanced_tripinfo_path,
+        detector_path=ga_enhanced_detector_path,
+        base_dir=GA_ENHANCED_PATH,
+        save_json=ga_enhaced_report_path
+    )
+
+    display_report(ga_enhnaced_report, header="GA-ENHANCED")
+
+    # TODO: COMPARE THE THREE REPORTS AND SUMMARIZE RESULTS
+    # TODO: ANALYZE AND VISUALIZE THE RESULTS
