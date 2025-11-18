@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+from copy import deepcopy
 from pathlib import Path
 from typing import List, Optional
 from custom_typings import SignalPhase
@@ -327,3 +328,71 @@ def generate_viewsettings_xml(output_path: Path, scheme="real world"):
     ET.SubElement(root, "scheme", {"name": scheme})
     xml_str = ET.tostring(root, encoding="unicode")
     output_path.write_text(xml_str)
+
+
+def parse_signal_plan(template_plan: List[SignalPhase], tls_path: str) -> List[SignalPhase]:
+    """
+    Convert a template signal plan (movements only) into a full plan
+    by grouping SUMO XML phases into G/A/R timing chunks.
+
+    Logic:
+        - Count total phases in the TLS XML.
+        - Divide by the number of template phases.
+        - For each template phase:
+            G = duration of chunk[0]
+            A = duration of chunk[1]
+            R = duration of chunk[2]
+        - Assign cumulative start times.
+    """
+
+    # --- Load TLS XML ---
+    xml_tree = ET.parse(tls_path)
+    root = xml_tree.getroot()
+
+    phases_xml = root.findall(".//phase")
+    if len(phases_xml) == 0:
+        raise ValueError("No <phase> elements found in TLS XML.")
+
+    # Extract durations
+    durations = [float(p.attrib["duration"]) for p in phases_xml]
+
+    tpl_phase_count = len(template_plan)
+    xml_phase_count = len(durations)
+
+    if xml_phase_count % tpl_phase_count != 0:
+        raise ValueError(
+            f"Cannot divide {xml_phase_count} XML phases into {tpl_phase_count} template phases."
+        )
+
+    # How many XML phases correspond to one template phase?
+    chunk_size = xml_phase_count // tpl_phase_count
+
+    if chunk_size != 3:
+        raise ValueError(
+            f"Expected 3 timing chunks per template phase, got {chunk_size}. "
+            f"Adjust logic if needed."
+        )
+
+    ready_plan = deepcopy(template_plan)
+    start_time = 0.0
+
+    idx = 0
+    for phase in ready_plan:
+        # Take 3 XML phases for this template phase
+        green = durations[idx]
+        amber = durations[idx + 1]
+        all_red = durations[idx + 2]
+
+        total_duration = green + amber + all_red
+
+        # Assign timing fields
+        phase.green = green
+        phase.amber = amber
+        phase.all_red = all_red
+        phase.duration = total_duration
+        phase.start = start_time
+
+        start_time += total_duration
+        idx += 3
+
+    return ready_plan

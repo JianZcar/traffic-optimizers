@@ -1,20 +1,11 @@
 from pathlib import Path
 
+# Intersection data sheets
+INTERSECTION_SHEETS_PATH = Path("src/intersections/sheets").resolve()
+
 # Documentation folder
-DOCUMENTATION_PATH = Path("documentation").resolve()
+DOCUMENTATION_DOCX_PATH = Path("documentation/docx").resolve()
+DOCUMENTATION_CSV_PATH = Path("documentation/csv").resolve()
 
-# Base network folder (nodes.xml, edges.xml, connections.xml)
-BASE_NETWORK_PATH = Path("sumo/base").resolve()
-
-# --- Additional folders for control strategies ---
-
-# Webster’s baseline simulation folder
-ORIGINAL_BASELINE_PATH = Path("sumo/original").resolve()
-
-# Webster’s baseline simulation folder
-WEBSTERS_PATH = Path("sumo/websters_baseline").resolve()
-
-# Genetic Algorithm–enhanced (GA) control simulation folder
-GA_ENHANCED_PATH = Path("sumo/ga_enhanced").resolve()
-
-
+# Base SUMO folder
+BASE_SUMO_PATH = Path("sumo").resolve()

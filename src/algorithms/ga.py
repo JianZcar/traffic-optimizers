@@ -10,7 +10,7 @@ from custom_typings import (Movement, SignalPlan, SignalPopulation, Intersection
 from algorithms.websters import compute_signal_config_with_poisson_and_websters
 from sumo_functions import generate_traffic_lights_xml, create_sumo_config
 from sumo_report import generate_report, run_sumo
-from constants import GA_ENHANCED_PATH
+from constants import BASE_SUMO_PATH
 
 
 def generate_population(size: int, signal_plan: SignalPlan) -> SignalPopulation:
@@ -177,7 +177,8 @@ def run_evolution(
     elitism_rate: float = 0.2,
     immigration_interval: int = 10,
     immigration_rate: float = 0.2,
-    fitness_tolerance: float = 0.03,
+    fitness_tolerance: float = 0.02,
+    repetition_tolerance: int = 6,
     routes_path: str | None = None,
     net_path: str | None = None,
 
@@ -185,34 +186,66 @@ def run_evolution(
     """
     Run GA for signal timing optimization.
     """
-    print(f"\n🚦 Starting GA in: {GA_ENHANCED_PATH.resolve()}")
+    print(f"\n🚦 Starting GA search for optimal signal config.")
+    GA_ENHANCED_PATH = BASE_SUMO_PATH / intersection.name / "ga_enhanced/"
     GA_ENHANCED_PATH.mkdir(parents=True, exist_ok=True)
 
     pop_size = len(population)
     elite_count = max(1, int(pop_size * elitism_rate))
     best_overall = None
     best_score = 99999
+    best_repeat_count = 0
 
-    for generation in range(generation_limit):
-        print(f"--- Generation {generation + 1}/{generation_limit} ---")
-
-        # --- 1. Evaluate fitness per individual ---
+    for generation in range(1, generation_limit + 1):
+        print(f"Generation {generation}/{generation_limit}: ")
+        # --- Evaluate fitness per individual ---
         fitness_scores = get_fitness_scores(
             population=population, intersection=intersection, routes_path=routes_path, net_path=net_path)
 
-        # --- 2. Sort population ---
+        # --- Sort population ---
         fitness_scores.sort(key=lambda x: x[1])
 
-        # --- 3. Record best individual ---
+        # --- Record best individual ---
         best_plan_gen, best_score_gen = fitness_scores[0]
 
-        if best_score_gen < best_score:
-            best_score = best_score_gen
+        # --- Check repetition of best overall based on the plan itself ---
+        if best_overall is None or not compare_signal_plans(best_plan_gen, best_overall):
             best_overall = copy.deepcopy(best_plan_gen)
+            best_score = best_score_gen
+            best_repeat_count = 0
+        else:
+            best_repeat_count += 1
 
-        print(f"BEST FITNESS: {best_score_gen}")
+        # --- Stopping criterions ---
+        fitness_values = [score for _, score in fitness_scores]
+        fit_var = float(np.var(fitness_values))
 
-        # --- 4. Elitism ---
+        print(
+            f"BEST FITNESS: {best_score_gen} REPEATED {best_repeat_count}/{repetition_tolerance}")
+        print(f"FITNESS VARIANCE: {fit_var}")
+
+        stagnant_population = fit_var < fitness_tolerance
+        stagnant_best = best_repeat_count >= repetition_tolerance
+
+        # 1. Stagnation conditions
+        if stagnant_population:
+            print(
+                f"🛑 Population variance below threshold at generation {generation} (var={fit_var:.4f})")
+            break
+
+        if stagnant_best:
+            print(
+                f"🛑 Best solution unchanged for {repetition_tolerance} generations at generation {generation}")
+            break
+
+            break
+
+        # 2. Generation limit check
+        if generation + 1 >= generation_limit + 1:
+            print(f"🛑 Reached generation limit at generation {generation}")
+            break
+
+        # --- Elitism ---
         # Keep top 'elite_count' individuals for the next generation
         elites = [copy.deepcopy(plan)
                   for plan, score in fitness_scores[:elite_count]]
@@ -220,14 +253,17 @@ def run_evolution(
         # Start next generation with elites
         next_gen = elites.copy()
 
-        # --- 5. Immigration ---
+        # --- Immigration ---
         if (generation + 1) % immigration_interval == 0:
-            num_immigrants = int(pop_size * immigration_rate)
+            num_immigrants = int(
+                pop_size
+                * (0.2 * (1 - generation / generation_limit) * immigration_rate)
+            )
             immigrants = generate_population(
                 num_immigrants, copy.deepcopy(signal_plan_template))
             next_gen.extend(immigrants)
 
-        # --- 6. Reproduction (Selection + Crossover + Mutation) ---
+        # --- Reproduction (Selection + Crossover + Mutation) ---
         while len(next_gen) < pop_size:
             parents = selection(fitness_scores)
             offspring = crossover(parents[0], parents[1])
@@ -239,23 +275,9 @@ def run_evolution(
 
         population = next_gen[:pop_size]
 
-        # --- 7. Convergence check ---
-        fitness_values = [score for _, score in fitness_scores]
-        fit_var = float(np.var(fitness_values))
-        if fit_var < fitness_tolerance:
-            print(f"🛑 Converged early at generation {generation + 1}")
-            break
+    final_population = [plan for plan, _ in fitness_scores]
 
-    # --- Final sorting ---
-    final_sorted = []
-    fitness_scores = get_fitness_scores(
-        population=population, intersection=intersection, routes_path=routes_path, net_path=net_path)
-
-    # --- Sort population based on fitness ---
-    final_sorted = [plan for plan, _ in sorted(
-        fitness_scores, key=lambda x: x[1])]
-
-    return final_sorted, generation + 1
+    return final_population, generation
 
 
 def get_fitness_scores(population: SignalPopulation, intersection: Intersection, routes_path: str, net_path: str) -> List[Tuple[SignalPlan, float]]:
@@ -298,3 +320,20 @@ def get_fitness_scores(population: SignalPopulation, intersection: Intersection,
                 (copy.deepcopy(plan), report["fitness_score"]))
 
         return fitness_scores
+
+
+def compare_signal_plans(signal_plan1: SignalPlan, signal_plan2: SignalPlan) -> bool:
+    """
+    Compare two signal plans for equality.
+    Returns True if all phases have identical green, amber, and all_red times.
+    """
+    if len(signal_plan1) != len(signal_plan2):
+        return False
+
+    for p1, p2 in zip(signal_plan1, signal_plan2):
+        if (p1.green != p2.green or
+            p1.amber != p2.amber or
+                p1.all_red != p2.all_red):
+            return False
+
+    return True

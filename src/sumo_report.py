@@ -322,6 +322,7 @@ def generate_report(
     # --- Build final report ---
     report = {
         "vehicle_count": vehicle_count,
+        "expected_vehicles": expected_arrivals,
         "avg_delay_timeLoss": avg_delay,
         "total_delay_timeLoss": total_delay,
         "avg_waiting_time": avg_waiting,
