@@ -6,7 +6,7 @@
   <phase duration="5" state="rrrrGGGGrrrr"/>
   <phase duration="3" state="rrrrGGyyrrrr"/>
   <phase duration="1.0" state="rrrrGGrrrrrr"/>
-  <phase duration="10" state="GGGGGGrrrrrr"/>
+  <phase duration="9" state="GGGGGGrrrrrr"/>
   <phase duration="3" state="GGyyyyrrrrrr"/>
   <phase duration="1.0" state="GGrrrrrrrrrr"/>
 </tlLogic>

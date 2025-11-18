@@ -1,5 +1,5 @@
 signal_plan_name,phase_1_green,phase_1_amber,phase_1_all_red,phase_2_green,phase_2_amber,phase_2_all_red,phase_3_green,phase_3_amber,phase_3_all_red
 ORIGINAL CONFIG,68.0,3.0,3.0,32.0,3.0,3.0,28.0,3.0,3.0
-PSO,5.0,5.0,5.0,10.0,30.0,5.0,30.0,30.0,30.0
-WEBSTER BASELINE,20,3,1,6,3,1,12,3,1
-GA ENHANCED,14,3,1.0,5,3,1.0,10,3,1.0
+PSO,30.0,5.0,5.0,8.0,5.0,5.0,30.0,5.0,5.0
+WEBSTER BASELINE,19,3,1,4,3,1,13,3,1
+GA ENHANCED,14,3,1.0,5,3,1.0,9,3,1.0

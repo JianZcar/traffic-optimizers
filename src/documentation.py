@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 from docx import Document
@@ -115,7 +116,15 @@ def plot_signal_plans(csv_file: Path):
                 # Annotate the duration inside the bar
                 if dur > 0:
                     plt.text(
-                        left_stack + dur / 2, y[i], str(dur), va='center', ha='center', color='black', fontsize=9)
+                        int(round(left_stack + dur / 2)),  # x
+                        int(y[i]),                          # y
+                        # display as integer
+                        str(int(dur)),
+                        va='center',
+                        ha='center',
+                        color='black',
+                        fontsize=6
+                    )
                 left_stack += dur  # update left position for next segment
 
     plt.yticks(y, df["signal_plan_name"])
@@ -137,7 +146,7 @@ def plot_signal_plans(csv_file: Path):
     return img_path
 
 
-def create_word_report(output_path: Path, scalability_img, comparative_imgs, signal_plan_img):
+def create_word_report(output_path: Path, scalability_img, comparative_imgs, signal_plan_img, scalability_folder: Path, comparative_csv: Path):
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doc = Document()
     doc.add_heading("Traffic Simulation Analysis Report", 0)
@@ -154,8 +163,59 @@ def create_word_report(output_path: Path, scalability_img, comparative_imgs, sig
         "Interpretation:\n"
         "- A stable and efficient signal plan should show a gradual increase in queue length as traffic volume rises.\n"
         "- Sharp spikes or nonlinear increases typically indicate that the signal timing is no longer sufficient.\n"
-        "- Comparing curves allows us to identify which scenarios scale best under heavier congestion."
+        "- Comparing curves allows us to identify which scenarios scale best under heavier congestion.\n"
+        "- The standard deviation of queue lengths across scenarios indicates stability:\n"
+        "  - Lower standard deviation values suggest consistent performance.\n"
+        "  - Higher standard deviation indicates more variability and potential instability in the signal plan.\n"
+        "- Including the standard deviation in the table allows direct comparison of stability between signal plans."
     )
+
+    scalability_files = sorted(scalability_folder.glob("*.csv"))
+
+    # Determine number of rows = max rows across CSVs
+    max_rows = max(len(pd.read_csv(f)) for f in scalability_files)
+
+    # Table: rows = max_rows + 2 (header + CV row), cols = num_signal_plans + 2 (Scenario + Total Vehicles)
+    table = doc.add_table(rows=max_rows + 2, cols=len(scalability_files) + 2)
+    table.style = 'Light Grid'
+
+    # Header row
+    table.cell(0, 0).text = "Scenario"
+    table.cell(0, 1).text = "Total Vehicles"
+    for col_idx, f in enumerate(scalability_files, start=2):
+        table.cell(0, col_idx).text = f.stem  # signal plan name
+
+    # Fill table
+    for row_idx in range(max_rows):
+        # Scenario and total vehicles (use first CSV as reference)
+        reference_df = pd.read_csv(scalability_files[0]).sort_values(
+            "total_flow").reset_index(drop=True)
+        if row_idx < len(reference_df):
+            table.cell(
+                row_idx + 1, 1).text = str(int(reference_df.loc[row_idx, 'total_flow']))
+        else:
+            table.cell(row_idx + 1, 1).text = ""
+
+        table.cell(row_idx + 1, 0).text = f"Scenario {row_idx + 1}"
+
+        # Fill avg_queue_length per signal plan
+        for col_idx, f in enumerate(scalability_files, start=2):
+            df = pd.read_csv(f).sort_values(
+                "total_flow").reset_index(drop=True)
+            if row_idx < len(df):
+                table.cell(
+                    row_idx + 1, col_idx).text = f"{df.loc[row_idx, 'avg_queue_length']:.1f}"
+            else:
+                table.cell(row_idx + 1, col_idx).text = ""
+
+    # Add final row for Coefficient of Variation (CV)
+    table.cell(max_rows + 1, 0).text = "Coefficient of Variation"
+    table.cell(max_rows + 1, 1).text = ""  # empty for total vehicles column
+    for col_idx, f in enumerate(scalability_files, start=2):
+        df = pd.read_csv(f)
+        cv = np.std(df["avg_queue_length"]) / \
+            np.mean(df["avg_queue_length"]) if len(df) > 0 else 0
+        table.cell(max_rows + 1, col_idx).text = f"{cv:.2f}"
 
     doc.add_picture(str(scalability_img), width=Inches(6))
     doc.add_paragraph(scalability_img.stem)
@@ -178,6 +238,33 @@ def create_word_report(output_path: Path, scalability_img, comparative_imgs, sig
         "- These charts help identify which signal plan provides the best overall efficiency."
     )
 
+    df = pd.read_csv(comparative_csv)
+
+    metrics = {
+        "avg_delay_timeLoss": "Average Delay Time (s)",
+        "avg_waiting_time": "Average Waiting Time (s)",
+        "avg_stops": "Average Stops",
+        "avg_duration": "Average Travel Time (s)"
+    }
+
+    # Create table with one extra column for metric labels
+    table = doc.add_table(rows=len(metrics) + 1, cols=len(df) + 1)
+    table.style = 'Light Grid'
+
+    # Header row
+    table.cell(0, 0).text = ""
+    for col_idx, plan_name in enumerate(df["signal_plan_name"], start=1):
+        table.cell(0, col_idx).text = str(plan_name)
+
+    # Fill metrics rows
+    for row_idx, (metric_col, metric_label) in enumerate(metrics.items(), start=1):
+        table.cell(row_idx, 0).text = metric_label  # Metric name
+        for col_idx, value in enumerate(df[metric_col], start=1):
+            if isinstance(value, float):
+                value = f"{value:.1f}"  # format floats nicely
+            table.cell(row_idx, col_idx).text = str(value)
+
+    # Add comparative bar charts
     for img in comparative_imgs:
         doc.add_picture(str(img), width=Inches(6))
         doc.add_paragraph(img.stem)
@@ -217,5 +304,11 @@ if __name__ == "__main__":
         DOCUMENTATION_CSV_PATH / intersection.name / "signal_plans.csv")
 
     # --- Create Word doc ---
-    create_word_report(OUTPUT_DOCX, scalability_img,
-                       comparative_imgs, signal_plan_img)
+    create_word_report(
+        OUTPUT_DOCX,
+        scalability_img,
+        comparative_imgs,
+        signal_plan_img,
+        DOCUMENTATION_CSV_PATH / intersection.name / "scalability_assessment",
+        DOCUMENTATION_CSV_PATH / intersection.name / "comparative_analysis.csv"
+    )

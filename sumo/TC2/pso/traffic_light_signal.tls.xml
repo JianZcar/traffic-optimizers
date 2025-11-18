@@ -1,12 +1,12 @@
 <?xml version="1.0" ?>
 <tlLogic id="J0" type="static" programID="1" offset="0">
-  <phase duration="5.0" state="GGrrrrrrGGGG"/>
+  <phase duration="30.0" state="GGrrrrrrGGGG"/>
   <phase duration="5.0" state="yyrrrrrryyyy"/>
   <phase duration="5.0" state="rrrrrrrrrrrr"/>
-  <phase duration="10.0" state="rrrrGGGGrrrr"/>
-  <phase duration="30.0" state="rrrrGGyyrrrr"/>
+  <phase duration="8.0" state="rrrrGGGGrrrr"/>
+  <phase duration="5.0" state="rrrrGGyyrrrr"/>
   <phase duration="5.0" state="rrrrGGrrrrrr"/>
   <phase duration="30.0" state="GGGGGGrrrrrr"/>
-  <phase duration="30.0" state="GGyyyyrrrrrr"/>
-  <phase duration="30.0" state="GGrrrrrrrrrr"/>
+  <phase duration="5.0" state="GGyyyyrrrrrr"/>
+  <phase duration="5.0" state="GGrrrrrrrrrr"/>
 </tlLogic>
