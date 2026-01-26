@@ -7,6 +7,25 @@ from math import ceil
 from typing import Dict, List
 
 
+def flow_stats(sheet, col="AC", start=68, end=82):
+    """Returns avg, min, max flow rate (veh/h) for a given movement."""
+    values = [
+        sheet[f"{col}{r}"].value
+        for r in range(start, end)
+        if sheet[f"{col}{r}"].value is not None
+    ]
+
+    if not values:
+        return {"avg": 0, "min": 0, "max": 0}
+
+    avg_flow = ceil(sum(values) / len(values))
+    return {
+        "avg": avg_flow,
+        "min": min(values),
+        "max": max(values)
+    }
+
+
 # --- DATA FROM SHEETS ---
 workbook = load_workbook(
     INTERSECTION_SHEETS_PATH / 'TC2.xlsx', data_only=True)
@@ -20,19 +39,14 @@ workbook = load_workbook(
 # flow_4_in_1_out: int = ceil(workbook['4-1']['AC86'].value)
 # flow_4_in_3_out: int = ceil(workbook['4-3']['AC86'].value)
 
+
 # Average flow rates (veh/h)
-flow_1_in_3_out = ceil(sum(v for v in [
-                       workbook['1-3'][f'AC{r}'].value for r in range(68, 82)] if v is not None) / 14)
-flow_1_in_4_out = ceil(sum(v for v in [
-                       workbook['1-4'][f'AC{r}'].value for r in range(68, 82)] if v is not None) / 14)
-flow_3_in_1_out = ceil(sum(v for v in [
-                       workbook['3-1'][f'AC{r}'].value for r in range(68, 82)] if v is not None) / 14)
-flow_3_in_4_out = ceil(sum(v for v in [
-                       workbook['3-4'][f'AC{r}'].value for r in range(68, 82)] if v is not None) / 14)
-flow_4_in_1_out = ceil(sum(v for v in [
-                       workbook['4-1'][f'AC{r}'].value for r in range(68, 82)] if v is not None) / 14)
-flow_4_in_3_out = ceil(sum(v for v in [
-                       workbook['4-3'][f'AC{r}'].value for r in range(68, 82)] if v is not None) / 14)
+flow_1_in_3_out = flow_stats(workbook["1-3"])
+flow_1_in_4_out = flow_stats(workbook["1-4"])
+flow_3_in_1_out = flow_stats(workbook["3-1"])
+flow_3_in_4_out = flow_stats(workbook["3-4"])
+flow_4_in_1_out = flow_stats(workbook["4-1"])
+flow_4_in_3_out = flow_stats(workbook["4-3"])
 
 
 # --- APPROACHES ---
@@ -78,127 +92,402 @@ approaches: List[Approach] = [approach_1_in, approach_1_out,
                               approach_4_in, approach_4_out]
 
 
-# --- MOVEMENTS ---
+# --- MIN MOVEMENTS ---
 
-# Movement: 1_in -> 3_out (North to South, Straight)
-movement_1_in_3_out_lane_0 = Movement(
+min_movement_1_in_3_out_lane_0 = Movement(
     from_approach=approach_1_in,
     to_approach=approach_3_out,
     lane_index=0,
     toLanes=[0],
-    average_flow=flow_1_in_3_out / 2,
+    expected_flow=flow_1_in_3_out["min"] / 2,
+    average_flow=flow_1_in_3_out["avg"] / 2,
 )
 
-movement_1_in_3_out_lane_1 = Movement(
+min_movement_1_in_3_out_lane_1 = Movement(
     from_approach=approach_1_in,
     to_approach=approach_3_out,
     lane_index=1,
     toLanes=[1],
-    average_flow=flow_1_in_3_out / 2,
+    expected_flow=flow_1_in_3_out["min"] / 2,
+    average_flow=flow_1_in_3_out["avg"] / 2,
+)
+
+min_movement_1_in_4_out_lane_0 = Movement(
+    from_approach=approach_1_in,
+    to_approach=approach_4_out,
+    lane_index=0,
+    toLanes=[0, 1],
+    expected_flow=flow_1_in_4_out["min"],
+    average_flow=flow_1_in_4_out["avg"],
+)
+
+min_movement_3_in_1_out_lane_0 = Movement(
+    from_approach=approach_3_in,
+    to_approach=approach_1_out,
+    lane_index=0,
+    toLanes=[0],
+    expected_flow=flow_3_in_1_out["min"] / 2,
+    average_flow=flow_3_in_1_out["avg"] / 2,
+)
+
+min_movement_3_in_1_out_lane_1 = Movement(
+    from_approach=approach_3_in,
+    to_approach=approach_1_out,
+    lane_index=1,
+    toLanes=[1],
+    expected_flow=flow_3_in_1_out["min"] / 2,
+    average_flow=flow_3_in_1_out["avg"] / 2,
+)
+
+min_movement_3_in_4_out_lane_1 = Movement(
+    from_approach=approach_3_in,
+    to_approach=approach_4_out,
+    lane_index=1,
+    toLanes=[0, 1],
+    expected_flow=flow_3_in_4_out["min"],
+    average_flow=flow_3_in_4_out["avg"],
+)
+
+min_movement_4_in_1_out_lane_1 = Movement(
+    from_approach=approach_4_in,
+    to_approach=approach_1_out,
+    lane_index=1,
+    toLanes=[0, 1],
+    expected_flow=flow_4_in_1_out["min"],
+    average_flow=flow_4_in_1_out["avg"],
+)
+
+min_movement_4_in_3_out_lane_0 = Movement(
+    from_approach=approach_4_in,
+    to_approach=approach_3_out,
+    lane_index=0,
+    toLanes=[0, 1],
+    expected_flow=flow_4_in_3_out["min"],
+    average_flow=flow_4_in_3_out["avg"],
+)
+
+min_movements = [
+    min_movement_1_in_3_out_lane_0, min_movement_1_in_3_out_lane_1,
+    min_movement_1_in_4_out_lane_0, min_movement_3_in_1_out_lane_0,
+    min_movement_3_in_1_out_lane_1, min_movement_3_in_4_out_lane_1,
+    min_movement_4_in_1_out_lane_1, min_movement_4_in_3_out_lane_0
+]
+
+min_flow_intersection = Intersection(
+    name="TC2",
+    approaches=approaches,
+    movements=min_movements
+)
+
+
+# --- AVG MOVEMENTS ---
+
+# Movement: 1_in -> 3_out (North to South, Straight)
+avg_movement_1_in_3_out_lane_0 = Movement(
+    from_approach=approach_1_in,
+    to_approach=approach_3_out,
+    lane_index=0,
+    toLanes=[0],
+    expected_flow=flow_1_in_3_out['avg'] / 2,
+    average_flow=flow_1_in_3_out['avg'] / 2,
+)
+
+avg_movement_1_in_3_out_lane_1 = Movement(
+    from_approach=approach_1_in,
+    to_approach=approach_3_out,
+    lane_index=1,
+    toLanes=[1],
+    expected_flow=flow_1_in_3_out['avg'] / 2,
+    average_flow=flow_1_in_3_out['avg'] / 2,
 )
 
 # Movement: 1_in -> 4_out (North to West, Right Turn)
-movement_1_in_4_out_lane_0 = Movement(
+avg_movement_1_in_4_out_lane_0 = Movement(
     from_approach=approach_1_in,
     to_approach=approach_4_out,
     lane_index=0,
     toLanes=[0, 1],
-    average_flow=flow_1_in_4_out,
+    expected_flow=flow_1_in_4_out["avg"],
+    average_flow=flow_1_in_4_out["avg"],
 )
 
 # Movement: 3_in -> 1_out (South to North, Straight)
-movement_3_in_1_out_lane_0 = Movement(
+avg_movement_3_in_1_out_lane_0 = Movement(
     from_approach=approach_3_in,
     to_approach=approach_1_out,
     lane_index=0,
     toLanes=[0],
-    average_flow=flow_3_in_1_out / 2,
+    expected_flow=flow_3_in_1_out["avg"] / 2,
+    average_flow=flow_3_in_1_out["avg"] / 2,
 )
 
-movement_3_in_1_out_lane_1 = Movement(
+avg_movement_3_in_1_out_lane_1 = Movement(
     from_approach=approach_3_in,
     to_approach=approach_1_out,
     lane_index=1,
     toLanes=[1],
-    average_flow=flow_3_in_1_out / 2,
+    expected_flow=flow_3_in_1_out["avg"] / 2,
+    average_flow=flow_3_in_1_out["avg"] / 2,
 )
 
 # Movement: 3_in -> 4_out (South to West, Left Turn)
-movement_3_in_4_out_lane_1 = Movement(
+avg_movement_3_in_4_out_lane_1 = Movement(
     from_approach=approach_3_in,
     to_approach=approach_4_out,
     lane_index=1,
     toLanes=[0, 1],
-    average_flow=flow_3_in_4_out,
+    expected_flow=flow_3_in_4_out["avg"],
+    average_flow=flow_3_in_4_out["avg"],
 )
 
 # Movement: 4_in -> 1_out (West to North, Left Turn)
-movement_4_in_1_out_lane_1 = Movement(
+avg_movement_4_in_1_out_lane_1 = Movement(
     from_approach=approach_4_in,
     to_approach=approach_1_out,
     lane_index=1,
     toLanes=[0, 1],
-    average_flow=flow_4_in_1_out,
+    expected_flow=flow_4_in_1_out["avg"],
+    average_flow=flow_4_in_1_out["avg"],
 )
 
 # Movement: 4_in -> 3_out (West to South, Right Turn)
-movement_4_in_3_out_lane_0 = Movement(
+avg_movement_4_in_3_out_lane_0 = Movement(
     from_approach=approach_4_in,
     to_approach=approach_3_out,
     lane_index=0,
     toLanes=[0, 1],
-    average_flow=flow_4_in_3_out,
+    expected_flow=flow_4_in_3_out["avg"],
+    average_flow=flow_4_in_3_out["avg"],
 )
 
-movements: List[Movement] = [movement_1_in_3_out_lane_0, movement_1_in_3_out_lane_1,
-                             movement_1_in_4_out_lane_0, movement_3_in_1_out_lane_0,
-                             movement_3_in_1_out_lane_1, movement_3_in_4_out_lane_1,
-                             movement_4_in_1_out_lane_1, movement_4_in_3_out_lane_0]
+avg_movements: List[Movement] = [avg_movement_1_in_3_out_lane_0, avg_movement_1_in_3_out_lane_1,
+                                 avg_movement_1_in_4_out_lane_0, avg_movement_3_in_1_out_lane_0,
+                                 avg_movement_3_in_1_out_lane_1, avg_movement_3_in_4_out_lane_1,
+                                 avg_movement_4_in_1_out_lane_1, avg_movement_4_in_3_out_lane_0]
 
-movements_dict: Dict[str, Movement] = {
-    f"{mv.from_approach.edge_id}_{mv.to_approach.edge_id}_{mv.lane_index}": mv
-    for mv in movements
-}
-
-# --- INTERSECTION ---
-intersection: Intersection = Intersection(name="TC2",
-                                          approaches=approaches,
-                                          movements=movements)
+avg_flow_intersection: Intersection = Intersection(name="TC2",
+                                                   approaches=approaches,
+                                                   movements=avg_movements)
 
 
-# --- PHASES (DEFAULT DESIGN) ---
-phase_1: SignalPhase = SignalPhase(
+# --- MAX MOVEMENTS ---
+max_movement_1_in_3_out_lane_0 = Movement(
+    from_approach=approach_1_in,
+    to_approach=approach_3_out,
+    lane_index=0,
+    toLanes=[0],
+    expected_flow=flow_1_in_3_out["max"] / 2,
+    average_flow=flow_1_in_3_out["avg"] / 2,
+)
+
+max_movement_1_in_3_out_lane_1 = Movement(
+    from_approach=approach_1_in,
+    to_approach=approach_3_out,
+    lane_index=1,
+    toLanes=[1],
+    expected_flow=flow_1_in_3_out["max"] / 2,
+    average_flow=flow_1_in_3_out["avg"] / 2,
+)
+
+max_movement_1_in_4_out_lane_0 = Movement(
+    from_approach=approach_1_in,
+    to_approach=approach_4_out,
+    lane_index=0,
+    toLanes=[0, 1],
+    expected_flow=flow_1_in_4_out["max"],
+    average_flow=flow_1_in_4_out["avg"],
+)
+
+max_movement_3_in_1_out_lane_0 = Movement(
+    from_approach=approach_3_in,
+    to_approach=approach_1_out,
+    lane_index=0,
+    toLanes=[0],
+    expected_flow=flow_3_in_1_out["max"] / 2,
+    average_flow=flow_3_in_1_out["avg"] / 2,
+)
+
+max_movement_3_in_1_out_lane_1 = Movement(
+    from_approach=approach_3_in,
+    to_approach=approach_1_out,
+    lane_index=1,
+    toLanes=[1],
+    expected_flow=flow_3_in_1_out["max"] / 2,
+    average_flow=flow_3_in_1_out["avg"] / 2,
+)
+
+max_movement_3_in_4_out_lane_1 = Movement(
+    from_approach=approach_3_in,
+    to_approach=approach_4_out,
+    lane_index=1,
+    toLanes=[0, 1],
+    expected_flow=flow_3_in_4_out["max"],
+    average_flow=flow_3_in_4_out["avg"],
+)
+
+max_movement_4_in_1_out_lane_1 = Movement(
+    from_approach=approach_4_in,
+    to_approach=approach_1_out,
+    lane_index=1,
+    toLanes=[0, 1],
+    expected_flow=flow_4_in_1_out["max"],
+    average_flow=flow_4_in_1_out["avg"],
+)
+
+max_movement_4_in_3_out_lane_0 = Movement(
+    from_approach=approach_4_in,
+    to_approach=approach_3_out,
+    lane_index=0,
+    toLanes=[0, 1],
+    expected_flow=flow_4_in_3_out["max"],
+    average_flow=flow_4_in_3_out["avg"],
+)
+
+max_movements = [
+    max_movement_1_in_3_out_lane_0, max_movement_1_in_3_out_lane_1,
+    max_movement_1_in_4_out_lane_0, max_movement_3_in_1_out_lane_0,
+    max_movement_3_in_1_out_lane_1, max_movement_3_in_4_out_lane_1,
+    max_movement_4_in_1_out_lane_1, max_movement_4_in_3_out_lane_0
+]
+
+max_flow_intersection = Intersection(
+    name="TC2",
+    approaches=approaches,
+    movements=max_movements
+)
+
+# --- PHASES (MIN DESIGN) ---
+min_phase_1: SignalPhase = SignalPhase(
     green=None,
     amber=None,
     all_red=None,
     start=None,
     duration=None,
-    movements=[movement_1_in_3_out_lane_0, movement_1_in_3_out_lane_1,
-               movement_1_in_4_out_lane_0,
-               movement_3_in_1_out_lane_0, movement_3_in_1_out_lane_1]
+    movements=[
+        min_movement_1_in_3_out_lane_0,
+        min_movement_1_in_3_out_lane_1,
+        min_movement_1_in_4_out_lane_0,
+        min_movement_3_in_1_out_lane_0,
+        min_movement_3_in_1_out_lane_1,
+    ]
 )
 
-phase_2: SignalPhase = SignalPhase(
+min_phase_2: SignalPhase = SignalPhase(
     green=None,
     amber=None,
     all_red=None,
     start=None,
     duration=None,
-    movements=[movement_4_in_1_out_lane_1, movement_4_in_3_out_lane_0]
+    movements=[
+        min_movement_4_in_1_out_lane_1,
+        min_movement_4_in_3_out_lane_0,
+    ]
 )
 
-phase_3: SignalPhase = SignalPhase(
+min_phase_3: SignalPhase = SignalPhase(
     green=None,
     amber=None,
     all_red=None,
     start=None,
     duration=None,
-    movements=[movement_3_in_1_out_lane_0, movement_3_in_1_out_lane_1,
-               movement_3_in_4_out_lane_1, movement_4_in_3_out_lane_0]
+    movements=[
+        min_movement_3_in_1_out_lane_0,
+        min_movement_3_in_1_out_lane_1,
+        min_movement_3_in_4_out_lane_1,
+        min_movement_4_in_3_out_lane_0,
+    ]
 )
 
+min_signal_plan: SignalPlan = [min_phase_1, min_phase_2, min_phase_3]
 
-signal_plan: SignalPlan = [phase_1, phase_2, phase_3]
+
+# --- PHASES (AVERAGE DESIGN) ---
+avg_phase_1: SignalPhase = SignalPhase(
+    green=None,
+    amber=None,
+    all_red=None,
+    start=None,
+    duration=None,
+    movements=[
+        avg_movement_1_in_3_out_lane_0,
+        avg_movement_1_in_3_out_lane_1,
+        avg_movement_1_in_4_out_lane_0,
+        avg_movement_3_in_1_out_lane_0,
+        avg_movement_3_in_1_out_lane_1,
+    ]
+)
+
+avg_phase_2: SignalPhase = SignalPhase(
+    green=None,
+    amber=None,
+    all_red=None,
+    start=None,
+    duration=None,
+    movements=[
+        avg_movement_4_in_1_out_lane_1,
+        avg_movement_4_in_3_out_lane_0,
+    ]
+)
+
+avg_phase_3: SignalPhase = SignalPhase(
+    green=None,
+    amber=None,
+    all_red=None,
+    start=None,
+    duration=None,
+    movements=[
+        avg_movement_3_in_1_out_lane_0,
+        avg_movement_3_in_1_out_lane_1,
+        avg_movement_3_in_4_out_lane_1,
+        avg_movement_4_in_3_out_lane_0,
+    ]
+)
+
+avg_signal_plan: SignalPlan = [avg_phase_1, avg_phase_2, avg_phase_3]
+
+# --- PHASES (MAX DESIGN) ---
+max_phase_1: SignalPhase = SignalPhase(
+    green=None,
+    amber=None,
+    all_red=None,
+    start=None,
+    duration=None,
+    movements=[
+        max_movement_1_in_3_out_lane_0,
+        max_movement_1_in_3_out_lane_1,
+        max_movement_1_in_4_out_lane_0,
+        max_movement_3_in_1_out_lane_0,
+        max_movement_3_in_1_out_lane_1,
+    ]
+)
+
+max_phase_2: SignalPhase = SignalPhase(
+    green=None,
+    amber=None,
+    all_red=None,
+    start=None,
+    duration=None,
+    movements=[
+        max_movement_4_in_1_out_lane_1,
+        max_movement_4_in_3_out_lane_0,
+    ]
+)
+
+max_phase_3: SignalPhase = SignalPhase(
+    green=None,
+    amber=None,
+    all_red=None,
+    start=None,
+    duration=None,
+    movements=[
+        max_movement_3_in_1_out_lane_0,
+        max_movement_3_in_1_out_lane_1,
+        max_movement_3_in_4_out_lane_1,
+        max_movement_4_in_3_out_lane_0,
+    ]
+)
+
+max_signal_plan: SignalPlan = [max_phase_1, max_phase_2, max_phase_3]
 
 
 # HOURLY VERSION
@@ -233,7 +522,6 @@ hours_4_in_3_out = [
     if workbook['4-3'][f'AC{r}'].value is not None
 ]
 
-
 intersection_hourly = []
 
 for hour in range(14):  # hours 0–13
@@ -243,7 +531,8 @@ for hour in range(14):  # hours 0–13
         to_approach=approach_3_out,
         lane_index=0,
         toLanes=[0],
-        average_flow=hours_1_in_3_out[hour] / 2
+        expected_flow=hours_1_in_3_out[hour] / 2,
+        average_flow=flow_1_in_3_out["avg"] / 2,
     )
 
     m_1_3_1 = Movement(
@@ -251,7 +540,8 @@ for hour in range(14):  # hours 0–13
         to_approach=approach_3_out,
         lane_index=1,
         toLanes=[1],
-        average_flow=hours_1_in_3_out[hour] / 2
+        expected_flow=hours_1_in_3_out[hour] / 2,
+        average_flow=flow_1_in_3_out["avg"] / 2,
     )
 
     m_1_4_0 = Movement(
@@ -259,7 +549,8 @@ for hour in range(14):  # hours 0–13
         to_approach=approach_4_out,
         lane_index=0,
         toLanes=[0, 1],
-        average_flow=hours_1_in_4_out[hour]
+        expected_flow=hours_1_in_4_out[hour],
+        average_flow=flow_1_in_4_out["avg"],
     )
 
     m_3_1_0 = Movement(
@@ -267,7 +558,8 @@ for hour in range(14):  # hours 0–13
         to_approach=approach_1_out,
         lane_index=0,
         toLanes=[0],
-        average_flow=hours_3_in_1_out[hour] / 2
+        expected_flow=hours_3_in_1_out[hour] / 2,
+        average_flow=flow_3_in_1_out["avg"] / 2
     )
 
     m_3_1_1 = Movement(
@@ -275,7 +567,8 @@ for hour in range(14):  # hours 0–13
         to_approach=approach_1_out,
         lane_index=1,
         toLanes=[1],
-        average_flow=hours_3_in_1_out[hour] / 2
+        expected_flow=hours_3_in_1_out[hour] / 2,
+        average_flow=flow_3_in_1_out["avg"] / 2
     )
 
     m_3_4_1 = Movement(
@@ -283,7 +576,8 @@ for hour in range(14):  # hours 0–13
         to_approach=approach_4_out,
         lane_index=1,
         toLanes=[0, 1],
-        average_flow=hours_3_in_4_out[hour]
+        expected_flow=hours_3_in_4_out[hour],
+        average_flow=flow_3_in_4_out["avg"]
     )
 
     m_4_1_1 = Movement(
@@ -291,7 +585,8 @@ for hour in range(14):  # hours 0–13
         to_approach=approach_1_out,
         lane_index=1,
         toLanes=[0, 1],
-        average_flow=hours_4_in_1_out[hour]
+        expected_flow=hours_4_in_1_out[hour],
+        average_flow=flow_4_in_1_out["avg"]
     )
 
     m_4_3_0 = Movement(
@@ -299,7 +594,8 @@ for hour in range(14):  # hours 0–13
         to_approach=approach_3_out,
         lane_index=0,
         toLanes=[0, 1],
-        average_flow=hours_4_in_3_out[hour]
+        expected_flow=hours_4_in_3_out[hour],
+        average_flow=flow_4_in_3_out["avg"]
     )
 
     # Create movement list and intersection
@@ -322,5 +618,4 @@ for hour in range(14):  # hours 0–13
 
 
 if __name__ == "__main__":
-    pprint(intersection)  # Need for constructing intersection in SUMO
-    pprint(signal_plan)  # Need for configuring traffic lights
+    pass

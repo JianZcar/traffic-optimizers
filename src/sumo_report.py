@@ -11,11 +11,11 @@ from custom_typings import Intersection, SignalPhase
 
 def compute_expected_arrivals(intersection: Intersection) -> float:
     """
-    Compute the expected total arrivals for an intersection based on movement.average_flow.
+    Compute the expected total arrivals for an intersection based on movement.expected_flow.
 
     Args:
         intersection: Intersection object containing a list of movements, 
-                      each with an average_flow attribute (vehicles per hour).
+                      each with an expected_flow attribute (vehicles per hour).
 
     Returns:
         expected_total_arrivals: float, sum of expected arrivals across all movements 
@@ -24,14 +24,14 @@ def compute_expected_arrivals(intersection: Intersection) -> float:
     expected_total_arrivals = 0.0
 
     for mv in intersection.movements:
-        # average_flow is in vehicles per hour
-        expected_total_arrivals += mv.average_flow
+        # expected_flow is in vehicles per hour
+        expected_total_arrivals += mv.expected_flow
 
     return expected_total_arrivals
 
 
 # ===============================
-#   RUN SUMO (OPTIONAL)
+#   RUN SUMO
 # ===============================
 def run_sumo(
         sumocfg_path: str,
@@ -189,7 +189,7 @@ def parse_tripinfo(tripinfo_path: str):
 
 
 # ===============================
-#   PARSE LANE DETECTOR OUTPUT (OPTIONAL)
+#   PARSE LANE DETECTOR OUTPUT
 # ===============================
 def parse_lane_detectors(detector_path: str, base_dir: Path = None):
     if detector_path is None or not Path(detector_path).exists():
@@ -239,30 +239,43 @@ def parse_lane_detectors(detector_path: str, base_dir: Path = None):
 # ===============================
 #   FITNESS FUNCTION
 # ===============================
-def compute_fitness(avg_delay, avg_waiting, avg_queue, avg_stops, avg_duration,
-                    expected_arrivals, counted_arrivals,
-                    w_delay=0.35, w_waiting=0.10, w_queue=0.25,
-                    w_stops=0.20, w_duration=0.05, w_arrival_error=0.05):
+def compute_fitness(
+    avg_delay, avg_waiting, avg_queue, avg_stops, avg_duration,
+    expected_arrivals, counted_arrivals,
+    max_delay=120.0,        # maximum expected average delay in seconds
+    max_waiting=60.0,       # maximum expected average waiting time
+    max_queue=10.0,         # maximum expected average queue length
+    max_stops=5.0,          # maximum expected average stops per vehicle
+    max_duration=120.0,     # maximum expected average phase duration
+    w_delay=0.25, w_waiting=0.15, w_queue=0.20,
+    w_stops=0.20, w_duration=0.10, w_arrival_error=0.10
+):
     """
     Lower fitness = better performance.
-    Uses AVERAGE metrics.
+    Normalizes metrics before applying weights to reduce bias.
     Penalizes mismatch between expected and served vehicles.
     """
 
     # Arrival Service Error (percentage)
-    if expected_arrivals > 0:
-        ase = abs(expected_arrivals - counted_arrivals) / expected_arrivals
-    else:
-        ase = 0.0
+    ase = abs(expected_arrivals - counted_arrivals) / \
+        expected_arrivals if expected_arrivals > 0 else 0.0
 
+    # Normalize each metric to 0-1
+    norm_delay = avg_delay / max_delay
+    norm_waiting = avg_waiting / max_waiting
+    norm_queue = avg_queue / max_queue
+    norm_stops = avg_stops / max_stops
+    norm_duration = avg_duration / max_duration
+
+    # Compute weighted fitness
     fitness = (
-        (w_delay * avg_delay) +
-        (w_waiting * avg_waiting) +
-        (w_queue * avg_queue) +
-        (w_stops * avg_stops) +
-        (w_duration * avg_duration) +
-        (w_arrival_error * ase)
-    )
+        w_delay * norm_delay +
+        w_waiting * norm_waiting +
+        w_queue * norm_queue +
+        w_stops * norm_stops +
+        w_duration * norm_duration +
+        w_arrival_error * ase
+    ) * 100
 
     return fitness
 
@@ -275,7 +288,7 @@ def generate_report(
         tripinfo_path: str,
         detector_path: str = None,
         base_dir: Path = None,
-        weights=(0.35, 0.2, 0.2, 0.1, 0.1, 0.05),  # updated weights tuple
+        weights=(0.25, 0.20, 0.20, 0.10, 0.15, 0.10),
         save_json: str = None):
 
     # --- Parse data sources ---
@@ -353,22 +366,40 @@ def generate_report(
 
 
 def display_report(report: dict, header="SIMULATION REPORT", footer=""):
+    """
+    Display a simulation report focusing on average metrics with weights,
+    including Arrival Service Error (ASE).
+    """
+    weights = report.get("weights", {})
+    vehicle_count = report.get("vehicle_count", 0)
+    expected_vehicles = report.get("expected_vehicles", vehicle_count)
+
+    # Compute ASE
+    if expected_vehicles > 0:
+        ase = abs(expected_vehicles - vehicle_count) / expected_vehicles
+    else:
+        ase = 0.0
+
     print(f"\n=============== {header} ===============")
-    print(f"Vehicles Simulated:       {report['vehicle_count']}")
-    print(f"Average Delay:            {report['avg_delay_timeLoss']:.2f} s")
-    print(f"Average Waiting Time:     {report['avg_waiting_time']:.2f} s")
-    print(f"Average Stops:            {report['avg_stops']:.2f}")
-    print(f"Average Queue Length:     {report['avg_queue_length']:.2f} veh")
-    print(f"Average Duration:         {report['avg_duration']:.2f} s")
-    print(f"Total Delay:              {report['total_delay_timeLoss']:.2f} s")
-    print(f"Total Waiting Time:       {report['total_waiting_time']:.2f} s")
-    print(f"Total Stops:              {report['total_stops']:.2f}")
-    print(f"Total Queue Length:       {report['total_queue_length']:.2f} veh")
-    print(f"Total Duration:           {report['total_duration']:.2f} s")
-    print("----------------------------------------------")
-    print(f"Fitness Score:            {report['fitness_score']:.2f}")
+    print(
+        f"Vehicles Simulated:       {vehicle_count} (Expected: {expected_vehicles})")
+    print(
+        f"Average Delay:            {report['avg_delay_timeLoss']:.2f} s \t({int(weights.get('delay', 0) * 100)}%)")
+    print(
+        f"Average Waiting Time:     {report['avg_waiting_time']:.2f} s \t({int(weights.get('waiting', 0) * 100)}%)")
+    print(
+        f"Average Stops:            {report['avg_stops']:.2f} \t\t({int(weights.get('stops', 0) * 100)}%)")
+    print(
+        f"Average Queue Length:     {report['avg_queue_length']:.2f} veh \t({int(weights.get('queue', 0) * 100)}%)")
+    print(
+        f"Average Duration:         {report['avg_duration']:.2f} s \t({int(weights.get('duration', 0) * 100)}%)")
+    print(
+        f"Arrival Service Error:    {ase:.4f} \t({int(weights.get('arrival_error', 0) * 100)}%)")
     if footer:
         print(f"---------------- {footer} ----------------")
+    else:
+        print(f"------------------------------------------")
+    print(f"Fitness Score:            {report['fitness_score']:.4f}")
     print("==============================================\n")
 
 

@@ -1,2 +1,0 @@
-signal_plan_name,vehicle_count,expected_vehicles,avg_delay_timeLoss,total_delay_timeLoss,avg_waiting_time,total_waiting_time,avg_stops,total_stops,avg_queue_length,total_queue_length,avg_duration,total_duration,fitness_score,weight_delay,weight_queue,weight_stops,weight_duration,weight_waiting,weight_arrival_error
-ORIGINAL CONFIG,1331,1654.0,51.0010818933133,67882.44,40.63561232156273,54086.0,0.7528174305033809,1002.0,2.6031944444444446,56229.0,69.79714500375657,92900.0,29.574620978161803,0.35,0.2,0.2,0.1,0.1,0.05

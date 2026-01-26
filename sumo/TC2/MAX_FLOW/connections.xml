@@ -1,0 +1,15 @@
+<?xml version="1.0" ?>
+<connections>
+  <connection from="1_in" to="3_out" fromLane="0" toLane="0" dir="S"/>
+  <connection from="1_in" to="3_out" fromLane="1" toLane="1" dir="S"/>
+  <connection from="1_in" to="4_out" fromLane="0" toLane="0" dir="R"/>
+  <connection from="1_in" to="4_out" fromLane="0" toLane="1" dir="R"/>
+  <connection from="3_in" to="1_out" fromLane="0" toLane="0" dir="S"/>
+  <connection from="3_in" to="1_out" fromLane="1" toLane="1" dir="S"/>
+  <connection from="3_in" to="4_out" fromLane="1" toLane="0" dir="L"/>
+  <connection from="3_in" to="4_out" fromLane="1" toLane="1" dir="L"/>
+  <connection from="4_in" to="1_out" fromLane="1" toLane="0" dir="L"/>
+  <connection from="4_in" to="1_out" fromLane="1" toLane="1" dir="L"/>
+  <connection from="4_in" to="3_out" fromLane="0" toLane="0" dir="R"/>
+  <connection from="4_in" to="3_out" fromLane="0" toLane="1" dir="R"/>
+</connections>

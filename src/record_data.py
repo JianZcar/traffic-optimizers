@@ -30,7 +30,10 @@ def add_row_to_csv_file(file_path: str, row: List[Any]) -> None:
 
 
 # --- CREATE CSV FUNCTIONS
-def create_comparative_analysis_csv(intersection: Intersection, num_phase: int) -> None:
+def create_comparative_analysis_csv(intersection: Intersection, num_phase: int, label: str = "") -> None:
+    """
+    Create a comparative analysis CSV for a given intersection.
+    """
     headers = [
         "signal_plan_name",
         "vehicle_count",
@@ -54,33 +57,44 @@ def create_comparative_analysis_csv(intersection: Intersection, num_phase: int) 
         "weight_arrival_error"
     ]
 
-    file_path = str(DOCUMENTATION_CSV_PATH /
-                    f"{intersection.name}/comparative_analysis.csv")
+    folder_path = DOCUMENTATION_CSV_PATH / \
+        intersection.name / (label if label else "")
+    folder_path.mkdir(parents=True, exist_ok=True)
+    file_path = folder_path / "comparative_analysis.csv"
 
-    create_csv_file(file_path=file_path, headers=headers)
+    create_csv_file(file_path=str(file_path), headers=headers)
 
 
-def create_signal_plans_csv(intersection: Intersection, num_phase: int) -> None:
+def create_signal_plans_csv(intersection: Intersection, num_phase: int, label: str = "") -> None:
+    """
+    Create a signal plans CSV for a given intersection.
+    """
     headers = ["signal_plan_name"]
-
     for i in range(num_phase):
         headers.extend(
             [f"phase_{i+1}_green", f"phase_{i+1}_amber", f"phase_{i+1}_all_red"])
 
-    file_path = str(DOCUMENTATION_CSV_PATH /
-                    f"{intersection.name}/signal_plans.csv")
+    folder_path = DOCUMENTATION_CSV_PATH / \
+        intersection.name / (label if label else "")
+    folder_path.mkdir(parents=True, exist_ok=True)
+    file_path = folder_path / "signal_plans.csv"
 
     create_csv_file(file_path=file_path, headers=headers)
 
 
-def create_scalability_assessment_csv(intersection: Intersection, signal_plan_name: str) -> None:
+def create_scalability_assessment_csv(intersection: Intersection, signal_plan_name: str, label: str) -> None:
     headers = ["scenario", "total_flow",
                "total_queue_length", "avg_queue_length"]
 
-    file_path = str(DOCUMENTATION_CSV_PATH /
-                    f"{intersection.name}/scalability_assessment/{signal_plan_name}.csv")
+    intersection_name = intersection.name.strip()
+    label_clean = label.strip()
+    signal_plan_name_clean = signal_plan_name.strip()
 
-    create_csv_file(file_path=file_path, headers=headers)
+    file_path = DOCUMENTATION_CSV_PATH / intersection_name / label_clean / \
+        "scalability_assessment" / f"{signal_plan_name_clean}.csv"
+
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    create_csv_file(file_path=str(file_path), headers=headers)
 
 
 # --- ADD ROW TO CSV FUNCTIONS
@@ -90,43 +104,54 @@ def add_report_to_comparative_analysis_csv(
     num_phase: int,
     intersection: Intersection,
     signal_plan: SignalPlan | None = None,
+    label: str = ""
 ) -> None:
     """
     Add a simulation result (report) into the comparative analysis CSV.
     """
-
-    file_path = DOCUMENTATION_CSV_PATH / \
-        intersection.name / "comparative_analysis.csv"
+    folder_path = DOCUMENTATION_CSV_PATH / \
+        intersection.name / (label if label else "")
+    file_path = folder_path / "comparative_analysis.csv"
 
     row = [
         signal_plan_name,
-        report["vehicle_count"],
-        report["expected_vehicles"],
-        report["avg_delay_timeLoss"],
-        report["total_delay_timeLoss"],
-        report["avg_waiting_time"],
-        report["total_waiting_time"],
-        report["avg_stops"],
-        report["total_stops"],
-        report["avg_queue_length"],
-        report["total_queue_length"],
-        report["avg_duration"],
-        report["total_duration"],
-        report["fitness_score"],
-        report["weights"]["delay"],
-        report["weights"]["queue"],
-        report["weights"]["stops"],
-        report["weights"]["duration"],
-        report["weights"]["waiting"],
-        report["weights"]["arrival_error"],
+        report.get("vehicle_count"),
+        report.get("expected_vehicles"),
+        report.get("avg_delay_timeLoss"),
+        report.get("total_delay_timeLoss"),
+        report.get("avg_waiting_time"),
+        report.get("total_waiting_time"),
+        report.get("avg_stops"),
+        report.get("total_stops"),
+        report.get("avg_queue_length"),
+        report.get("total_queue_length"),
+        report.get("avg_duration"),
+        report.get("total_duration"),
+        report.get("fitness_score"),
+        report.get("weights", {}).get("delay"),
+        report.get("weights", {}).get("queue"),
+        report.get("weights", {}).get("stops"),
+        report.get("weights", {}).get("duration"),
+        report.get("weights", {}).get("waiting"),
+        report.get("weights", {}).get("arrival_error"),
     ]
 
     add_row_to_csv_file(file_path=str(file_path), row=row)
 
 
-def add_signal_plan_to_signal_plans_csv(intersection: Intersection, signal_plan_name: str, num_phase: int, signal_plan: SignalPlan | None = None) -> None:
-    file_path = DOCUMENTATION_CSV_PATH / \
-        intersection.name / "signal_plans.csv"
+def add_signal_plan_to_signal_plans_csv(
+    intersection: Intersection,
+    signal_plan_name: str,
+    num_phase: int,
+    signal_plan: SignalPlan | None = None,
+    label: str = ""
+) -> None:
+    """
+    Add a signal plan into the signal plans CSV.
+    """
+    folder_path = DOCUMENTATION_CSV_PATH / \
+        intersection.name / (label if label else "")
+    file_path = folder_path / "signal_plans.csv"
 
     row = [signal_plan_name]
 
@@ -134,11 +159,7 @@ def add_signal_plan_to_signal_plans_csv(intersection: Intersection, signal_plan_
     if signal_plan is not None:
         for i in range(num_phase):
             phase = signal_plan[i]
-            row.extend([
-                phase.green,
-                phase.amber,
-                phase.all_red
-            ])
+            row.extend([phase.green, phase.amber, phase.all_red])
     else:
         # Fill with None if no phase data
         for _ in range(num_phase):
@@ -148,6 +169,7 @@ def add_signal_plan_to_signal_plans_csv(intersection: Intersection, signal_plan_
 
 
 def add_scalability_assessment_row(
+    label: str,
     intersection: Intersection,
     signal_plan_name: str,
     scenario: str,
@@ -155,18 +177,14 @@ def add_scalability_assessment_row(
     total_queue_length: float,
     avg_queue_length: float
 ) -> None:
-    """
-    Append a row to the scalability assessment CSV for a given signal plan.
-    """
-    file_path = DOCUMENTATION_CSV_PATH / \
-        intersection.name / "scalability_assessment" / \
-        f"{signal_plan_name}.csv"
+    intersection_name = intersection.name.strip()
+    label_clean = label.strip()
+    signal_plan_name_clean = signal_plan_name.strip()
 
-    row = [
-        scenario,
-        total_flow,
-        total_queue_length,
-        avg_queue_length
-    ]
+    file_path = DOCUMENTATION_CSV_PATH / intersection_name / label_clean / \
+        "scalability_assessment" / f"{signal_plan_name_clean}.csv"
 
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    row = [scenario, total_flow, total_queue_length, avg_queue_length]
     add_row_to_csv_file(file_path=str(file_path), row=row)

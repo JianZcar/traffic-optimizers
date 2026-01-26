@@ -5,10 +5,8 @@ from pathlib import Path
 from docx import Document
 from docx.shared import Inches
 from constants import DOCUMENTATION_CSV_PATH, DOCUMENTATION_DOCX_PATH
-from intersections.TC2 import intersection
-
-# Output Word document
-OUTPUT_DOCX = DOCUMENTATION_DOCX_PATH / "traffic_analysis_report.docx"
+# from intersections.TC2 import avg_flow_intersection
+from intersections.TC9 import avg_flow_intersection
 
 
 def plot_scalability(csv_folder: Path):
@@ -295,20 +293,126 @@ if __name__ == "__main__":
     DOCUMENTATION_CSV_PATH.mkdir(parents=True, exist_ok=True)
     DOCUMENTATION_DOCX_PATH.mkdir(parents=True, exist_ok=True)
 
-    # --- Generate charts ---
-    scalability_img = plot_scalability(
-        DOCUMENTATION_CSV_PATH / intersection.name / "scalability_assessment")
-    comparative_imgs = plot_comparative_analysis(
-        DOCUMENTATION_CSV_PATH / intersection.name / "comparative_analysis.csv")
-    signal_plan_img = plot_signal_plans(
-        DOCUMENTATION_CSV_PATH / intersection.name / "signal_plans.csv")
+    intersection = avg_flow_intersection
+    volumes = ["MIN FLOW", "AVG FLOW", "MAX FLOW"]
 
-    # --- Create Word doc ---
-    create_word_report(
-        OUTPUT_DOCX,
-        scalability_img,
-        comparative_imgs,
-        signal_plan_img,
-        DOCUMENTATION_CSV_PATH / intersection.name / "scalability_assessment",
-        DOCUMENTATION_CSV_PATH / intersection.name / "comparative_analysis.csv"
-    )
+    # Ensure the folder exists
+    output_path = DOCUMENTATION_DOCX_PATH / intersection.name
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # Full path to the Word report
+    output_file = output_path / "traffic_analysis.docx"
+
+    doc = Document()
+    doc.add_heading("Traffic Simulation Analysis Report", 0)
+
+    # --- Objective 1: Scalability Assessment ---
+    doc.add_heading("Objective 1: Scalability Assessment", level=1)
+
+    for volume in volumes:
+        doc.add_page_break()
+        doc.add_heading(f"Traffic Volume: {volume}", level=2)
+
+        # Paths
+        scalability_folder = DOCUMENTATION_CSV_PATH / \
+            intersection.name / volume / "scalability_assessment"
+        scalability_img = plot_scalability(scalability_folder)
+
+        doc.add_paragraph(
+            f"Evaluation of intersection under {volume} traffic demand.")
+        doc.add_picture(str(scalability_img), width=Inches(6))
+        doc.add_paragraph(scalability_img.stem)
+
+        # --- Table ---
+        scalability_files = list(scalability_folder.glob("*.csv"))
+
+        # Desired column order
+        desired_order = ["original", "pso", "websters_baseline", "ga_enhanced"]
+
+        # Map file stem to file path
+        file_map = {f.stem: f for f in scalability_files}
+
+        # Reorder files according to desired_order
+        scalability_files_sorted = [file_map[name]
+                                    for name in desired_order if name in file_map]
+
+        # Determine max rows
+        max_rows = max(len(pd.read_csv(f)) for f in scalability_files_sorted)
+
+        # Create table: rows = max_rows + 2 (header + CV row), cols = num_signal_plans + 2 (Scenario + Total Vehicles)
+        table = doc.add_table(
+            rows=max_rows + 2, cols=len(scalability_files_sorted) + 2)
+        table.style = "Light Grid"
+
+        # Header
+        table.cell(0, 0).text = "Scenario"
+        table.cell(0, 1).text = "Total Vehicles"
+        for col_idx, f in enumerate(scalability_files_sorted, start=2):
+            table.cell(0, col_idx).text = f.stem
+
+        # Fill table
+        reference_df = pd.read_csv(scalability_files_sorted[0]).sort_values(
+            "total_flow").reset_index(drop=True)
+        for row_idx in range(max_rows):
+            table.cell(row_idx + 1, 0).text = f"Scenario {row_idx + 1}"
+            table.cell(row_idx + 1, 1).text = str(int(
+                reference_df.loc[row_idx, 'total_flow'])) if row_idx < len(reference_df) else ""
+            for col_idx, f in enumerate(scalability_files_sorted, start=2):
+                df = pd.read_csv(f).sort_values(
+                    "total_flow").reset_index(drop=True)
+                table.cell(
+                    row_idx + 1, col_idx).text = f"{df.loc[row_idx, 'avg_queue_length']:.1f}" if row_idx < len(df) else ""
+
+        # Coefficient of Variation row
+        table.cell(max_rows + 1, 0).text = "Coefficient of Variation"
+        table.cell(max_rows + 1, 1).text = ""
+        for col_idx, f in enumerate(scalability_files_sorted, start=2):
+            df = pd.read_csv(f)
+            cv = np.std(df["avg_queue_length"]) / \
+                np.mean(df["avg_queue_length"]) if len(df) > 0 else 0
+            table.cell(max_rows + 1, col_idx).text = f"{cv:.2f}"
+
+    # --- Objective 2: Traffic Flow Efficiency ---
+    doc.add_heading("Objective 2: Traffic Flow Efficiency", level=1)
+    for volume in volumes:
+        doc.add_page_break()
+        doc.add_heading(f"Traffic Volume: {volume}", level=2)
+        comparative_csv = DOCUMENTATION_CSV_PATH / \
+            intersection.name / volume / "comparative_analysis.csv"
+        comparative_imgs = plot_comparative_analysis(comparative_csv)
+        df = pd.read_csv(comparative_csv)
+        metrics = {
+            "avg_delay_timeLoss": "Average Delay Time (s)",
+            "avg_waiting_time": "Average Waiting Time (s)",
+            "avg_stops": "Average Stops",
+            "avg_duration": "Average Travel Time (s)"
+        }
+
+        table = doc.add_table(rows=len(metrics) + 1, cols=len(df) + 1)
+        table.style = 'Light Grid'
+        table.cell(0, 0).text = ""
+        for col_idx, plan_name in enumerate(df["signal_plan_name"], start=1):
+            table.cell(0, col_idx).text = str(plan_name)
+        for row_idx, (metric_col, metric_label) in enumerate(metrics.items(), start=1):
+            table.cell(row_idx, 0).text = metric_label
+            for col_idx, value in enumerate(df[metric_col], start=1):
+                table.cell(row_idx, col_idx).text = f"{value:.1f}" if isinstance(
+                    value, float) else str(value)
+
+        for img in comparative_imgs:
+            doc.add_picture(str(img), width=Inches(6))
+            doc.add_paragraph(img.stem)
+
+    # --- Objective 3: Signal Plan Phase Allocation ---
+    doc.add_heading("Objective 3: Signal Plan Phase Allocation", level=1)
+    for volume in volumes:
+        doc.add_page_break()
+        doc.add_heading(f"Traffic Volume: {volume}", level=2)
+        signal_plan_csv = DOCUMENTATION_CSV_PATH / \
+            intersection.name / volume / "signal_plans.csv"
+        signal_plan_img = plot_signal_plans(signal_plan_csv)
+        doc.add_picture(str(signal_plan_img), width=Inches(6))
+        doc.add_paragraph(signal_plan_img.stem)
+
+    # --- Save the report ---
+    doc.save(output_file)

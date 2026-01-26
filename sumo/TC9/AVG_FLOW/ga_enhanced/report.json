@@ -1,0 +1,23 @@
+{
+    "vehicle_count": 1638,
+    "expected_vehicles": 1654.0,
+    "avg_delay_timeLoss": 18.0014652014652,
+    "total_delay_timeLoss": 29486.4,
+    "avg_waiting_time": 8.787545787545788,
+    "total_waiting_time": 14394.0,
+    "avg_stops": 0.6446886446886447,
+    "total_stops": 1056.0,
+    "avg_queue_length": 0.7181944444444445,
+    "total_queue_length": 15513.0,
+    "avg_duration": 36.276556776556774,
+    "total_duration": 59420.99999999999,
+    "fitness_score": 13.08211675030599,
+    "weights": {
+        "delay": 0.25,
+        "queue": 0.2,
+        "stops": 0.2,
+        "duration": 0.1,
+        "waiting": 0.15,
+        "arrival_error": 0.1
+    }
+}

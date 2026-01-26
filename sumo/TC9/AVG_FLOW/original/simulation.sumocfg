@@ -1,0 +1,23 @@
+<?xml version="1.0" ?>
+<configuration>
+  <input>
+    <net-file value="D:\academics\PSU\4th-year-1st-sem\traffic-optimizers\sumo\TC9\AVG_FLOW\network.net.xml"/>
+    <route-files value="D:\academics\PSU\4th-year-1st-sem\traffic-optimizers\sumo\TC9\AVG_FLOW\routes.xml"/>
+  </input>
+  <additional>
+    <additional-files value="D:\academics\PSU\4th-year-1st-sem\traffic-optimizers\sumo\TC9\AVG_FLOW\original\traffic_light_signal.tls.xml"/>
+  </additional>
+  <gui_only>
+    <start value="true"/>
+    <delay value="60"/>
+  </gui_only>
+  <gui-settings-file value="D:\academics\PSU\4th-year-1st-sem\traffic-optimizers\sumo\TC9\AVG_FLOW\viewsettings.xml"/>
+  <time>
+    <begin value="0"/>
+    <end value="3600"/>
+  </time>
+  <report>
+    <verbose value="true"/>
+    <no-step-log value="true"/>
+  </report>
+</configuration>

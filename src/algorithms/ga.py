@@ -187,9 +187,6 @@ def run_evolution(
     Run GA for signal timing optimization.
     """
     print(f"\n🚦 Starting GA search for optimal signal config.")
-    GA_ENHANCED_PATH = BASE_SUMO_PATH / intersection.name / "ga_enhanced/"
-    GA_ENHANCED_PATH.mkdir(parents=True, exist_ok=True)
-
     pop_size = len(population)
     elite_count = max(1, int(pop_size * elitism_rate))
     best_overall = None

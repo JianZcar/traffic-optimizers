@@ -134,7 +134,7 @@ def generate_routes_xml(intersection: Intersection, output_path: Path):
             "to": mv.to_approach.edge_id,
             "begin": "0",
             "end": "3600",
-            "number": str(int(mv.average_flow))
+            "number": str(int(mv.expected_flow))
         })
 
     output_path.write_text(prettify_xml(root), encoding="utf-8")

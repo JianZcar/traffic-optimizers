@@ -43,6 +43,7 @@ class Movement:
     lane_index: int  # <-- THIS MOVEMENT USES ONE SPECIFIC LANE
 
     movement_type: Optional[str] = None
+    expected_flow: float = 100  # veh/h
     average_flow: float = 100  # veh/h
 
     # computed fields
@@ -116,7 +117,7 @@ class Intersection:
     approaches: List[Approach]
     movements: List[Movement]
     position: Tuple[float, float] = (0.0, 0.0)
-    radius: float = 30.0
+    radius: float = 40.0
 
     def __post_init__(self):
         # Assign lanes immediately upon creation
